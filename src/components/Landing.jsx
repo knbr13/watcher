@@ -28,18 +28,17 @@ const Landing = () => {
   const onChange = (data) => {
     setCode(data);
   };
-  console.log(code)
+
   const handleCompile = () => {
     setProcessing(true);
     const formData = {
       language_id: language.id,
-      source_code: window.atob(code),
-      stdin: window.atob(customInput),
+      source_code: code,
+      stdin: customInput,
     };
     const options = {
       method: "POST",
       url: import.meta.env.VITE_RAPID_API_URL,
-      params: { base64_encoded: "true", fields: "*" },
       headers: {
         "content-type": "application/json",
         "Content-Type": "application/json",
@@ -115,7 +114,7 @@ const Landing = () => {
           <ThemesDropdown handleThemeChange={handleThemeChange} theme={theme} />
         </div>
       </div>
-      <div className="flex flex-row space-x-4 items-start px-4 py-4">
+      <div className="flex flex-col md:flex-row space-x-4 items-start px-4 py-4">
         <div className="flex flex-col w-full h-full justify-start items-end">
           <CodeEditorWindow
             code={code}
@@ -125,7 +124,7 @@ const Landing = () => {
           />
         </div>
 
-        <div className="right-container flex flex-shrink-0 w-[30%] flex-col">
+        <div className="right-container flex flex-shrink-0 w-[30%] flex-row md:flex-col">
           <OutputWindow outputDetails={outputDetails} />
           <div className="flex flex-col items-end">
             <CustomInput
