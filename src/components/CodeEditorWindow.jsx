@@ -18,7 +18,7 @@ const CodeEditorWindow = ({ onChange, language, code, theme }) => {
         language={language || "javascript"}
         value={value}
         theme={theme}
-        defaultValue="// some comment"
+        defaultValue="console.log('Hello World');"
         onChange={handleEditorChange}
       />
     </div>
