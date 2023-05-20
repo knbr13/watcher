@@ -2,7 +2,7 @@ export const languageOptions = [
     {
       id: 63,
       name: "JavaScript",
-      label: "JavaScript",
+      label: "Node JS",
       value: "javascript",
     },
     {
@@ -31,42 +31,6 @@ export const languageOptions = [
     },
     {
       id: 76,
-      name: "C++",
-      label: "C++",
-      value: "cpp",
-    },
-    {
-      id: 48,
-      name: "C",
-      label: "C",
-      value: "c",
-    },
-    {
-      id: 52,
-      name: "C++",
-      label: "C++",
-      value: "cpp",
-    },
-    {
-      id: 49,
-      name: "C",
-      label: "C",
-      value: "c",
-    },
-    {
-      id: 53,
-      name: "C++",
-      label: "C++",
-      value: "cpp",
-    },
-    {
-      id: 50,
-      name: "C",
-      label: "C",
-      value: "c",
-    },
-    {
-      id: 54,
       name: "C++",
       label: "C++",
       value: "cpp",
@@ -219,12 +183,6 @@ export const languageOptions = [
     },
     {
       id: 70,
-      name: "Python",
-      label: "Python",
-      value: "python",
-    },
-    {
-      id: 71,
       name: "Python",
       label: "Python",
       value: "python",
