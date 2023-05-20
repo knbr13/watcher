@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CodeEditorWindow from "./CodeEditorWindow";
 import LanguagesDropdown from "./LanguagesDropdown";
 import { languageOptions } from "../constants/languageOptions";
@@ -13,15 +13,22 @@ import OutputWindow from "./OutputWindow";
 const Landing = () => {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState(languageOptions[0]);
-  const [theme, setTheme] = useState("cobalt");
+  const [theme, setTheme] = useState({
+    value: "blackboard",
+    label: "Blackboard",
+  });
   const [processing, setProcessing] = useState(false);
   const [customInput, setCustomInput] = useState("");
   const [outputDetails, setOutputDetails] = useState(null);
 
+  useEffect(() => {
+    defineTheme(theme.value).then(() => {});
+  }, []);
+
   const onChange = (data) => {
     setCode(data);
   };
-
+  console.log(code)
   const handleCompile = () => {
     setProcessing(true);
     const formData = {

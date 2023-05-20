@@ -7,7 +7,7 @@ const CodeEditorWindow = ({ onChange, language, code, theme }) => {
 
   const handleEditorChange = (value) => {
     setValue(value);
-    onChange("code", value);
+    onChange(value);
   };
 
   return (
