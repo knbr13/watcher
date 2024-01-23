@@ -1,0 +1,2 @@
+lsof -t -i :8080 | xargs kill;
+go run ./demo/main.go
