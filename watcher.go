@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -29,6 +29,9 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
+	eventTime := time.Now()
+	var lastEvent fsnotify.Op
+
 	for {
 		select {
 		case event, ok := <-watcher.Events:
@@ -36,8 +39,7 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 				return
 			}
 			for _, op := range options.registredEvents {
-				if event.Has(op) {
-					log.Printf("%v on %v => executing command %v\n", event.Op, event.Name, options.commands)
+				if event.Has(op) && (time.Since(eventTime) > (time.Millisecond*400) || lastEvent != event.Op) {
 					for _, s := range options.commands {
 						cmd := exec.Command(s[0], s[1:]...)
 						cmd.Stdout = os.Stdout
@@ -47,6 +49,8 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 							fmt.Fprintf(os.Stderr, "error: can't start command: %s\n", err.Error())
 							continue
 						}
+						eventTime = time.Now()
+						lastEvent = event.Op
 						// TODO: a way to organize the output of the commands in a better way
 					}
 				}
