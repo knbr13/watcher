@@ -38,16 +38,14 @@ func validateAndParseFlags(
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "err: %v\n", err)
 		os.Exit(1)
-	} else {
-		opt.path = path
 	}
+	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
 		fmt.Fprintf(os.Stderr, "err: %v\n", "recursive flag can only be used with directories")
 		os.Exit(1)
-	} else {
-		opt.recursive = recursive
 	}
+	opt.recursive = recursive
 
 	// parse events
 	if events == "all" {
@@ -81,7 +79,6 @@ func validateAndParseFlags(
 		}
 	}
 	opt.commands = parseCommands(commands)
-	return
 }
 
 func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
@@ -111,7 +108,7 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 			if !ok {
 				return
 			}
-			log.Println("error: ", err)
+			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 		}
 	}
 }

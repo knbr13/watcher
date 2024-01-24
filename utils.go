@@ -21,8 +21,7 @@ func addSubdirectories(root string, watcher *fsnotify.Watcher) error {
 		if slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
 			return nil
 		}
-		err = watcher.Add(path)
-		return err
+		return watcher.Add(path)
 	})
 	return err
 }
