@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -17,12 +18,21 @@ type watcherOptions struct {
 }
 
 func (opt *watcherOptions) print() {
-	//TODO: colorize the option with emoji
-	fmt.Println("watcher version 0.1.0")
-	fmt.Println("path: ", opt.path)
-	fmt.Println("commands: ", opt.commands)
-	fmt.Println("events: ", opt.registredEvents)
-	fmt.Println("recursive: ", opt.recursive)
+	fmt.Println("👀  Watcher v0.1.0")
+	fmt.Printf("📂  Path: %s\n", opt.path)
+	fmt.Printf("🔍  Events: %v\n", opt.registredEvents)
+	fmt.Printf("🔄  Recursive: %v\n", opt.recursive)
+
+	if len(opt.commands) > 0 {
+		fmt.Println("🚀  Commands to run:")
+		for _, command := range opt.commands {
+			fmt.Printf("    %v\n", strings.Join(command, " "))
+		}
+	} else {
+		fmt.Println("⚠️   No commands specified to run on events.")
+	}
+
+	fmt.Println("\nlistening for events...")
 }
 
 func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
@@ -51,7 +61,6 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 						}
 						eventTime = time.Now()
 						lastEvent = event.Op
-						// TODO: a way to organize the output of the commands in a better way
 					}
 				}
 			}
