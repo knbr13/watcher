@@ -3,29 +3,64 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+func main() {
+	var path, command string
+	var recursive bool
+	var events string
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("error: %s\n", err.Error())
+	}
+
+	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
+	flag.StringVar(&path, "path", wd, "path to the directory to watch for events on")
+	flag.StringVar(&events, "events", "all", "events to watch for (write, create, chmod, remove, rename, all)")
+	flag.BoolVar(&recursive, "r", false, "watch subdirectories recursively")
+	flag.Parse()
+
+	options := validateAndParseFlags(
+		command,
+		path,
+		events,
+		recursive,
+	)
+	options.print()
+	watcher, _ := fsnotify.NewWatcher()
+	defer watcher.Close()
+
+	if options.recursive {
+		addSubdirectories(options.path, watcher)
+	} else {
+		watcher.Add(options.path)
+	}
+
+	go watchEvents(watcher, options)
+	<-make(chan struct{})
+}
+
+// validateAndParseFlags function to validate the flag and build the watcherOptions struct
 func validateAndParseFlags(
 	commands string,
 	path string,
 	events string,
 	recursive bool,
 ) (opt watcherOptions) {
-	// a function to validate the flag and build the watcherOptions struct
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("error: %s\n", err.Error())
 	}
 	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
-		fmt.Fprintf(os.Stderr, "err: %v\n", "recursive flag can only be used with directories")
-		os.Exit(1)
+		log.Fatalf("error: %s\n", err.Error())
 	}
 	opt.recursive = recursive
 
@@ -62,37 +97,4 @@ func validateAndParseFlags(
 	}
 	opt.commands = parseCommands(commands)
 	return
-}
-
-func main() {
-	var path, command string
-	var recursive bool
-	var events string
-
-	wd, _ := os.Getwd()
-
-	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
-	flag.StringVar(&path, "path", wd, "path to the directory to watch for events on")
-	flag.StringVar(&events, "events", "all", "events to watch for (write, create, chmod, remove, rename, all)")
-	flag.BoolVar(&recursive, "r", false, "watch subdirectories recursively")
-	flag.Parse()
-
-	options := validateAndParseFlags(
-		command,
-		path,
-		events,
-		recursive,
-	)
-	options.print()
-	watcher, _ := fsnotify.NewWatcher()
-	defer watcher.Close()
-
-	if options.recursive {
-		addSubdirectories(options.path, watcher)
-	} else {
-		watcher.Add(options.path)
-	}
-
-	go watchEvents(watcher, options)
-	<-make(chan struct{})
 }
