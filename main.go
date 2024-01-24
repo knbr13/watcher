@@ -95,9 +95,9 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 				if event.Has(op) {
 					log.Printf("%v on %v => executing command %v\n", event.Op, event.Name, options.commands)
 					for _, cmd := range options.commands {
-						cmd.Start()
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
+						cmd.Start()
 						// TODO: a way to organize the output of the commands in a better way
 					}
 				}
