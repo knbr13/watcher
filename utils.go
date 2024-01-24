@@ -33,7 +33,7 @@ func parseCommands(cmd string) [][]string {
 	for _, cmd := range cmds {
 		cmd = strings.TrimSpace(cmd)
 		cmds = strings.Split(cmd, " ")
-		if len(cmds) == 0 {
+		if len(cmds) < 1 || cmds[0] == "" {
 			continue
 		}
 		res = append(res, cmds)
