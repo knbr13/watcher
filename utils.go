@@ -2,7 +2,6 @@ package main
 
 import (
 	"io/fs"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -28,18 +27,19 @@ func addSubdirectories(root string, watcher *fsnotify.Watcher) error {
 	return err
 }
 
-func parseCommands(cmd string) []*exec.Cmd {
+func parseCommands(cmd string) [][]string {
 	cmd = strings.TrimSpace(cmd)
-	cmds := strings.Split(cmd, ";") // echo hello;echo world // []string{"echo hello     ", "echo world"}
-	execCommands := make([]*exec.Cmd, 0, len(cmds))
+	cmds := strings.Split(cmd, ";")
+	var res [][]string
 	for _, cmd := range cmds {
 		cmd = strings.TrimSpace(cmd)
-		if cmd == "" {
+		cmds = strings.Split(cmd, " ")
+		if len(cmds) == 0 {
 			continue
 		}
-		execCommands = append(execCommands, exec.Command("sh", "-c", cmd))
+		res = append(res, cmds)
 	}
-	return execCommands
+	return res
 }
 
 var excludedFolders = []string{

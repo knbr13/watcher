@@ -13,7 +13,7 @@ import (
 
 type watcherOptions struct {
 	path            string
-	commands        []*exec.Cmd
+	commands        [][]string
 	registredEvents []fsnotify.Op
 	recursive       bool
 }
@@ -94,7 +94,8 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 			for _, op := range options.registredEvents {
 				if event.Has(op) {
 					log.Printf("%v on %v => executing command %v\n", event.Op, event.Name, options.commands)
-					for _, cmd := range options.commands {
+					for _, s := range options.commands {
+						cmd := exec.Command(s[0], s[1:]...)
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
 						err := cmd.Start()
