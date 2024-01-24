@@ -1,1 +1,1 @@
-echo "\t-----event occurred at '$(date)'-----"
+echo "\t-----'script.sh' file was executed at: '$(date)'-----\t"
