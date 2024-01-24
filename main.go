@@ -83,6 +83,9 @@ func validateAndParseFlags(
 }
 
 func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
+	if watcher == nil {
+		panic("watcher is nil!")
+	}
 	for {
 		select {
 		case event, ok := <-watcher.Events:
