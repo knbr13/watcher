@@ -3,84 +3,143 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
-	"time"
+	"os/exec"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+type watcherOptions struct {
+	path            string
+	commands        []*exec.Cmd
+	registredEvents []fsnotify.Op
+	recursive       bool
+}
+
+func (opt *watcherOptions) print() {
+	//TODO: colorize the option with emoji
+	fmt.Println("watcher version 0.1.0")
+	fmt.Println("path: ", opt.path)
+	fmt.Println("commands: ", opt.commands)
+	fmt.Println("events: ", opt.registredEvents)
+	fmt.Println("recursive: ", opt.recursive)
+}
+
+func validateAndParseFlags(
+	commands string,
+	path string,
+	events string,
+	recursive bool,
+) (opt watcherOptions) {
+	// a function to validate the flag and build the watcherOptions struct
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "err: %v\n", err)
+		os.Exit(1)
+	} else {
+		opt.path = path
+	}
+
+	if recursive && !fileInfo.IsDir() {
+		fmt.Fprintf(os.Stderr, "err: %v\n", "recursive flag can only be used with directories")
+		os.Exit(1)
+	} else {
+		opt.recursive = recursive
+	}
+
+	// parse events
+	if events == "all" {
+		opt.registredEvents = []fsnotify.Op{
+			fsnotify.Write,
+			fsnotify.Create,
+			fsnotify.Chmod,
+			fsnotify.Remove,
+			fsnotify.Rename,
+		}
+	} else {
+		events = strings.ToLower(events)
+		eventsList := strings.Split(events, ",")
+		for _, event := range eventsList {
+			event = strings.TrimSpace(event)
+			switch event {
+			case "write":
+				opt.registredEvents = append(opt.registredEvents, fsnotify.Write)
+			case "create":
+				opt.registredEvents = append(opt.registredEvents, fsnotify.Create)
+			case "chmod":
+				opt.registredEvents = append(opt.registredEvents, fsnotify.Chmod)
+			case "remove":
+				opt.registredEvents = append(opt.registredEvents, fsnotify.Remove)
+			case "rename":
+				opt.registredEvents = append(opt.registredEvents, fsnotify.Rename)
+			default:
+				fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid event: ", event)
+				os.Exit(1)
+			}
+		}
+	}
+	opt.commands = parseCommands(commands)
+	return
+}
+
+func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			for _, op := range options.registredEvents {
+				if event.Has(op) {
+					log.Printf("%v on %v => executing command %v\n", event.Op, event.Name, options.commands)
+					for _, cmd := range options.commands {
+						cmd.Start()
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						// TODO: a way to organize the output of the commands in a better way
+					}
+				}
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Println("error: ", err)
+		}
+	}
+}
+
 func main() {
 	var path, command string
-	var write, create, chmod, remove, rename bool
-	
+	var recursive bool
+	var events string
+
 	wd, _ := os.Getwd()
 
 	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
 	flag.StringVar(&path, "path", wd, "path to the directory to watch for events on")
-	flag.BoolVar(&write, "write", true, "write event")
-	flag.BoolVar(&create, "create", false, "create event")
-	flag.BoolVar(&chmod, "chmod", false, "chmod event")
-	flag.BoolVar(&remove, "remove", false, "remove event")
-	flag.BoolVar(&rename, "rename", false, "rename event")
+	flag.StringVar(&events, "events", "all", "events to watch for (write, create, chmod, remove, rename, all)")
+	flag.BoolVar(&recursive, "r", false, "watch subdirectories recursively")
 	flag.Parse()
 
-	m := map[fsnotify.Op]bool{
-		fsnotify.Remove: remove,
-		fsnotify.Chmod:  chmod,
-		fsnotify.Create: create,
-		fsnotify.Rename: rename,
-		fsnotify.Write:  write,
-	}
-
-	var atLeastOneTrue bool
-	for _, v := range m {
-		if v {
-			atLeastOneTrue = true
-		}
-	}
-
-	if !atLeastOneTrue {
-		fmt.Fprint(os.Stderr, "err: at least one event should be specified\n")
-		os.Exit(1)
-	}
-
-	_, err := os.Stat(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %v\n", err)
-		os.Exit(1)
-	}
-
+	options := validateAndParseFlags(
+		command,
+		path,
+		events,
+		recursive,
+	)
+	options.print()
 	watcher, _ := fsnotify.NewWatcher()
-	err = addSubdirectories(path, watcher)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %v\n", err)
-		os.Exit(1)
+	defer watcher.Close()
+
+	if options.recursive {
+		addSubdirectories(options.path, watcher)
+	} else {
+		watcher.Add(options.path)
 	}
 
-	eventTime := time.Now()
-
-	for {
-		select {
-		case event := <-watcher.Events:
-			for k, ok := range m {
-				if event.Has(k) && ok && time.Since(eventTime) > time.Millisecond*500 {
-					cmds := parseCommands(command)
-					for _, c := range cmds {
-						c.Stderr = os.Stderr
-						c.Stdout = os.Stdout
-
-						err = c.Start()
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "err: %v\n", err)
-							os.Exit(1)
-						}
-					}
-					eventTime = time.Now()
-				}
-			}
-		case err := <-watcher.Errors:
-			fmt.Fprintf(os.Stderr, "err: %v\n", err)
-			os.Exit(1)
-		}
-	}
+	go watchEvents(watcher, options)
+	<-make(chan struct{})
 }
