@@ -25,7 +25,7 @@ Watcher is a tool written in Go that monitors file system events and executes sp
 2. Change to the project directory:
 
     ```bash
-    cd your-file-watcher
+    cd watcher
     ```
 
 3. Build the project:
@@ -37,13 +37,13 @@ Watcher is a tool written in Go that monitors file system events and executes sp
 4. Run the executable:
 
     ```bash
-    ./your-file-watcher
+    ./watcher
     ```
 
 ### Usage
 
 ```bash
-./your-file-watcher -cmd "your-command" -path "/path/to/watch" -events "specify-events" -r
+./watcher -cmd "your-command" -path "/path/to/watch" -events "specify-events" -r
 ```
 #### Command Line Options:
     -cmd: Specify the command to run on events.
