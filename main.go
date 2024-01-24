@@ -97,7 +97,11 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 					for _, cmd := range options.commands {
 						cmd.Stdout = os.Stdout
 						cmd.Stderr = os.Stderr
-						cmd.Start()
+						err := cmd.Start()
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "error: can't start command: %s\n", err.Error())
+							continue
+						}
 						// TODO: a way to organize the output of the commands in a better way
 					}
 				}
