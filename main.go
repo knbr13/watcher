@@ -79,6 +79,7 @@ func validateAndParseFlags(
 		}
 	}
 	opt.commands = parseCommands(commands)
+	return
 }
 
 func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
