@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -17,7 +16,7 @@ func main() {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
 	}
 
 	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
@@ -55,12 +54,12 @@ func validateAndParseFlags(
 ) (opt watcherOptions) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		log.Fatalf("error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
 	}
 	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
-		log.Fatalf("error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "err: you can't use recursive flag with a file\n")
 	}
 	opt.recursive = recursive
 
