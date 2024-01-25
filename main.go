@@ -26,7 +26,7 @@ func main() {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
+    fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
 		os.Exit(1)
 	}
 
