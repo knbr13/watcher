@@ -10,6 +10,16 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+func init() {
+	fmt.Println(`
+                 _      __ ______ / /_ _____ / /_   ___   _____
+                | | /| / // __  // __// ___// __ \ / _ \ / ___/
+                | |/ |/ // /_/ // /_ / /__ / / / //  __// /    
+                |__/|__/ \____/ \__/ \___//_/ /_/ \___//_/     
+                                                                
+    `)
+}
+
 func main() {
 	var path, command string
 	var recursive bool
