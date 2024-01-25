@@ -70,7 +70,7 @@ func validateAndParseFlags(
 	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
-		log.Fatalf("error: %s\n", err.Error())
+		log.Fatalf("error: %s\n", "you can't use recursive '-r' flag with a file")
 	}
 	opt.recursive = recursive
 
