@@ -27,6 +27,7 @@ func main() {
 	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
+		os.Exit(1)
 	}
 
 	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
@@ -65,11 +66,13 @@ func validateAndParseFlags(
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
+		os.Exit(1)
 	}
 	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
 		fmt.Fprintf(os.Stderr, "err: you can't use recursive flag with a file\n")
+		os.Exit(1)
 	}
 	opt.recursive = recursive
 
