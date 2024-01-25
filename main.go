@@ -65,11 +65,13 @@ func validateAndParseFlags(
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "err: %v%s\n", "invalid path: ", path)
+		os.Exit(1)
 	}
 	opt.path = path
 
 	if recursive && !fileInfo.IsDir() {
 		fmt.Fprintf(os.Stderr, "err: you can't use recursive flag with a file\n")
+		os.Exit(1)
 	}
 	opt.recursive = recursive
 
