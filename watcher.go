@@ -29,7 +29,7 @@ func (opt *watcherOptions) print() {
 			fmt.Printf("    %v\n", strings.Join(command, " "))
 		}
 	} else {
-		fmt.Println("⚠️   No commands specified to run on events.")
+		fmt.Println("⚠️   No commands specified to run on events. Events will be printed to stdout.")
 	}
 
 	fmt.Println("\nlistening for events...")
@@ -50,6 +50,10 @@ func watchEvents(watcher *fsnotify.Watcher, options watcherOptions) {
 			}
 			for _, op := range options.registredEvents {
 				if event.Has(op) && (time.Since(eventTime) > (time.Millisecond*400) || lastEvent != event.Op) {
+					if len(options.commands) == 0 {
+						fmt.Printf("%s  %s\n", time.Now().Format("2006-01-02 15:04:05"), event)
+						continue
+					}
 					for _, s := range options.commands {
 						cmd := exec.Command(s[0], s[1:]...)
 						cmd.Stdout = os.Stdout
