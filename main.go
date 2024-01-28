@@ -20,17 +20,16 @@ func init() {
 }
 
 func main() {
-	var path, command string
+	var path, command, events string
 	var recursive bool
-	var events string
 
 	wd, err := os.Getwd()
 	if err != nil {
-    fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	flag.StringVar(&command, "cmd", "", "command to run when new event occur")
+	flag.StringVar(&command, "cmd", "", "semicolon separated commands to run when new event occur")
 	flag.StringVar(&path, "path", wd, "path to the directory to watch for events on")
 	flag.StringVar(&events, "events", "all", "events to watch for (write, create, chmod, remove, rename, all)")
 	flag.BoolVar(&recursive, "r", false, "watch subdirectories recursively")
@@ -47,7 +46,7 @@ func main() {
 	defer watcher.Close()
 
 	if options.recursive {
-		addSubdirectories(options.path, watcher)
+		addPathRecursively(options.path, watcher)
 	} else {
 		watcher.Add(options.path)
 	}

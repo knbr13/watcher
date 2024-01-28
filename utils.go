@@ -9,7 +9,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func addSubdirectories(root string, watcher *fsnotify.Watcher) error {
+func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
