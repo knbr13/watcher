@@ -16,4 +16,4 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /watcher
 EXPOSE 9095
 
 # Run
-CMD ["/watcher"]
+CMD ["./watcher"]
