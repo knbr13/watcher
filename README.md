@@ -44,7 +44,7 @@ Watcher is a tool written in Go that monitors file system events and executes sp
 
 ```bash
 ./watcher -cmd "your-commands" -path "/path/to/watch" -events "specify-events" -r
-``l
+```
 
 #### Command Line Options:
     -cmd: Specify the commands to run on events, separated by ';'.
