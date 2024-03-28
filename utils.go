@@ -3,6 +3,7 @@ package main
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -21,6 +22,15 @@ func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
 		return watcher.Add(path)
 	})
 	return err
+}
+
+func parseCommand(cmd string) *exec.Cmd {
+	cmd = strings.TrimSpace(cmd)
+	parts := strings.Split(cmd, " ")
+	if len(parts) < 2 {
+		return nil
+	}
+	return exec.Command(parts[0], parts[1:]...)
 }
 
 var excludedFolders = []string{
