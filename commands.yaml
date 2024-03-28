@@ -1,0 +1,12 @@
+write:
+  - echo i am write event
+rename:
+  - echo i am rename event
+remove:
+  - echo i am remove event
+chmod:
+  - echo i am chmod event
+create:
+  - echo i am create event
+common:
+  - echo i am common event
