@@ -82,6 +82,15 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 					}
 				}
 			}
+			for _, v := range cf.Common {
+				if cmd := wrapCmd(parseCommand(v)); cmd != nil {
+					err := cmd.Run()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error running command %q: %s\n", v, err)
+						continue
+					}
+				}
+			}
 			eventTime = time.Now()
 			lastEvent = event.Op
 		case err, ok := <-watcher.Errors:
