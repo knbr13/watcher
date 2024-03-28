@@ -33,6 +33,14 @@ func parseCommand(cmd string) *exec.Cmd {
 	return exec.Command(parts[0], parts[1:]...)
 }
 
+func wrapCmd(cmd *exec.Cmd) *exec.Cmd {
+	if cmd != nil {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	return cmd
+}
+
 var excludedFolders = []string{
 	"node_modules",
 	"vendor",
