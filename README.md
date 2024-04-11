@@ -19,6 +19,6 @@ Watcher is a tool written in Go that monitors file system events and executes sp
 ```
 
 #### Command Line Options:
-    "-p, --path": Set the path to the directory to watch for events.
-    "-f, --file": Set the path to the file that contains the commands to run on each event.
     "-r, --recursive": Watch subdirectories recursively.
+    "-p, --path": Set the path to the directory to watch for events.
+    "-f, --file": Set the path to the file that contains the commands to run on each event, check out the `commands.yaml` file to see how this file should look like.
