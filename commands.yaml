@@ -1,12 +1,13 @@
 write:
-  - echo i am write event
+  - echo "this command will run on write events"
+  - echo "this is another command that will run on write events"
 rename:
-  - echo i am rename event
+  - echo "this command will run on rename events"
 remove:
-  - echo i am remove event
+  - echo "this command will run on remove events"
 chmod:
-  - echo i am chmod event
+  - echo "this command will run on chmod events"
 create:
-  - echo i am create event
+  - echo "this command will run on create events"
 common:
-  - echo i am common event
+  - echo "this command will run on every event occurred"
