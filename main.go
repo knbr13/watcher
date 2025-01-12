@@ -24,13 +24,11 @@ func main() {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
-		os.Exit(1)
+		fatalf("err: %s\n", err.Error())
 	}
 
 	if args.Path != "" && !validPath(args.Path) {
-		fmt.Fprintf(os.Stderr, "err: %s\n", "invalid path: "+args.Path)
-		os.Exit(1)
+		fatalf("err: invalid path %q\n", args.Path)
 	}
 
 	if args.Path == "" {
@@ -41,20 +39,17 @@ func main() {
 
 	data, err := os.ReadFile(args.File)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
-		os.Exit(1)
+		fatalf("err: %s\n", err.Error())
 	}
 
 	err = c.Parse(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
-		os.Exit(1)
+		fatalf("err: %s\n", err.Error())
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
-		os.Exit(1)
+		fatalf("err: %s\n", err.Error())
 	}
 	defer watcher.Close()
 
