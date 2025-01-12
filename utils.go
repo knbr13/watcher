@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -66,4 +67,10 @@ var excludedFolders = []string{
 func validPath(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// fatalf prints a formatted error message to stderr and exits with status code 1
+func fatalf(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, msg, args...)
+	os.Exit(1)
 }
