@@ -45,7 +45,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	c.Parse(data)
+	err = c.Parse(data)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "err: %s\n", err.Error())
+		os.Exit(1)
+	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
