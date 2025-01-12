@@ -18,3 +18,9 @@ Watcher is a simple tool written in Go that monitors file system events on a spe
     "-r, --recursive": watch subdirectories recursively.
     "-p, --path": set the path to the directory to watch for events.
     "-f, --file": set the path to the file that contains the commands to run on each event, check out the `commands.yaml` file to see how this file should look like.
+
+## License
+
+This project is licensed under the [MIT License](https://github.com/knbr13/watcher/blob/main/LICENSE). 
+
+See the [LICENSE](https://github.com/knbr13/watcher/blob/main/LICENSE) file for details.
