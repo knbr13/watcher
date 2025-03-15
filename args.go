@@ -10,13 +10,18 @@ type args struct {
 	Recursive bool   `arg:"-r,--recursive"`
 }
 
+type Rule struct {
+	Pattern  string   `yaml:"pattern"`
+	Commands []string `yaml:"commands"`
+}
+
 type CommandsFile struct {
-	Write  []string `yaml:"write"`
-	Chmod  []string `yaml:"chmod"`
-	Rename []string `yaml:"rename"`
-	Remove []string `yaml:"remove"`
-	Create []string `yaml:"create"`
-	Common []string `yaml:"common"`
+	Write  []Rule `yaml:"write"`
+	Chmod  []Rule `yaml:"chmod"`
+	Rename []Rule `yaml:"rename"`
+	Remove []Rule `yaml:"remove"`
+	Create []Rule `yaml:"create"`
+	Common []Rule `yaml:"common"`
 }
 
 func (c *CommandsFile) Parse(data []byte) error {

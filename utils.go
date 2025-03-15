@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/shlex"
 )
@@ -50,6 +51,15 @@ func wrapCmd(cmd *exec.Cmd) *exec.Cmd {
 		cmd.Stderr = os.Stderr
 	}
 	return cmd
+}
+
+func matchesPattern(path, pattern string) bool {
+	matched, err := doublestar.Match(pattern, path)
+	if err != nil {
+		fmt.Printf("error matching pattern %q: %s\n", pattern, err.Error())
+		return false
+	}
+	return matched
 }
 
 var excludedFolders = []string{
