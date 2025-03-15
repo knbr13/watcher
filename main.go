@@ -54,9 +54,12 @@ func main() {
 	defer watcher.Close()
 
 	if args.Recursive {
-		addPathRecursively(args.Path, watcher)
+		err = addPathRecursively(args.Path, watcher)
 	} else {
-		watcher.Add(args.Path)
+		err = watcher.Add(args.Path)
+	}
+	if err != nil {
+		fatalf("err: %s\n", err.Error())
 	}
 
 	watchEvents(watcher, *c)

@@ -16,7 +16,8 @@ import (
 func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "watch error: %s\n", err.Error())
+			return nil
 		}
 		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
 			return nil
