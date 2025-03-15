@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/shlex"
 )
 
 func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
@@ -27,9 +28,17 @@ func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
 
 func parseCommand(cmd string) *exec.Cmd {
 	cmd = strings.TrimSpace(cmd)
-	parts := strings.Split(cmd, " ")
-	if len(parts) < 2 {
+	if cmd == "" {
 		return nil
+	}
+
+	parts, err := shlex.Split(cmd)
+	if err != nil || len(parts) == 0 {
+		return nil
+	}
+
+	if len(parts) == 1 {
+		return exec.Command(parts[0])
 	}
 	return exec.Command(parts[0], parts[1:]...)
 }
