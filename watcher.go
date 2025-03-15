@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -24,19 +25,23 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 			if !(time.Since(eventTime) > (time.Millisecond*400) || lastEvent != event.Op) {
 				continue
 			}
+
+			fName := filepath.Base(event.Name)
+
 			switch event.Op.String() {
 			case fsnotify.Write.String():
-				handleEvent(cf.Write)
+				handleEvent(cf.Write, fName)
 			case fsnotify.Create.String():
-				handleEvent(cf.Create)
+				handleEvent(cf.Create, fName)
 			case fsnotify.Remove.String():
-				handleEvent(cf.Remove)
+				handleEvent(cf.Remove, fName)
 			case fsnotify.Rename.String():
-				handleEvent(cf.Rename)
+				handleEvent(cf.Rename, fName)
 			case fsnotify.Chmod.String():
-				handleEvent(cf.Chmod)
+				handleEvent(cf.Chmod, fName)
 			}
-			handleEvent(cf.Common)
+			handleEvent(cf.Common, fName)
+
 			eventTime = time.Now()
 			lastEvent = event.Op
 		case err, ok := <-watcher.Errors:
@@ -48,16 +53,23 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 	}
 }
 
-func handleEvent(cmds []string) {
-	for _, v := range cmds {
-		go func(cmd string) {
-			if cmd := wrapCmd(parseCommand(v)); cmd != nil {
-				err := cmd.Run()
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error running command %q: %s\n", v, err)
-					return
+func handleEvent(rules []Rule, fName string) {
+	for _, rule := range rules {
+		if !matchesPattern(fName, rule.Pattern) {
+			fmt.Printf("fName: %s | rule.Pattern: %s\n", fName, rule.Pattern)
+			continue
+		}
+
+		for _, cmd := range rule.Commands {
+			go func(cmd string) {
+				if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+					err := cmd.Run()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
+						return
+					}
 				}
-			}
-		}(v)
+			}(cmd)
+		}
 	}
 }

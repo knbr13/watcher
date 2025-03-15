@@ -1,13 +1,23 @@
 write:
-  - echo "this command will run on write events"
-  - echo "this is another command that will run on write events"
+  - pattern: "**/*.go"
+    commands:
+     - echo "write event"
 rename:
-  - echo "this command will run on rename events"
+  - pattern: "*"
+    commands:
+     - echo "rename event"
 remove:
-  - echo "this command will run on remove events"
+  - pattern: "*"
+    commands:
+     - echo "remove event"
 chmod:
-  - echo "this command will run on chmod events"
+  - pattern: "*"
+    commands:
+     - echo "chmod event"
 create:
-  - echo "this command will run on create events"
+  - pattern: "*"
+    commands:
+     - echo "create event"
 common:
-  - echo "this command will run on every event occurred"
+  - pattern: "*"
+    commands:
