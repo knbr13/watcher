@@ -1,23 +1,35 @@
 write:
   - pattern: "**/*.go"
     commands:
-     - echo "write event"
+      - echo "write event for $FILE"
+      - echo "Triggered by $USER at $TIMESTAMP"
+
 rename:
   - pattern: "*"
     commands:
-     - echo "rename event"
+      - echo "rename event for $FILE"
+      - echo "Renamed by $USER"
+
 remove:
   - pattern: "*"
     commands:
-     - echo "remove event"
+      - echo "remove event for $FILE"
+      - echo "Removed by $USER"
+
 chmod:
   - pattern: "*"
     commands:
-     - echo "chmod event"
+      - echo "chmod event for $FILE"
+      - echo "Permissions changed by $USER"
+
 create:
   - pattern: "*"
     commands:
-     - echo "create event"
+      - echo "create event for $FILE"
+      - echo "Created by $USER on $TIMESTAMP"
+
 common:
   - pattern: "*"
     commands:
+      - echo "common event triggered by $USER"
+      - echo "Event triggered at $TIMESTAMP"
