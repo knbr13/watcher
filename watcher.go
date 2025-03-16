@@ -55,21 +55,31 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 
 func handleEvent(rules []Rule, fName string) {
 	for _, rule := range rules {
-		if !matchesPattern(fName, rule.Pattern) {
-			fmt.Printf("fName: %s | rule.Pattern: %s\n", fName, rule.Pattern)
-			continue
-		}
-
-		for _, cmd := range rule.Commands {
-			go func(cmd string) {
-				if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-					err := cmd.Run()
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
-						return
+		go func(rule Rule) {
+			if !matchesPattern(fName, rule.Pattern) {
+				return
+			}
+			for _, cmd := range rule.Commands {
+				if rule.Sequential {
+					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+						err := cmd.Run()
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
+							return
+						}
 					}
+					continue
 				}
-			}(cmd)
-		}
+				go func(cmd string) {
+					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+						err := cmd.Run()
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
+							return
+						}
+					}
+				}(cmd)
+			}
+		}(rule)
 	}
 }
