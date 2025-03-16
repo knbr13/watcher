@@ -1,12 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -62,28 +66,59 @@ func handleEvent(rules []Rule, fName string) {
 			if !matchesPattern(fName, rule.Pattern) {
 				return
 			}
+			var wg sync.WaitGroup
+			var errOccurred atomic.Bool
 			for _, cmd := range rule.Commands {
 				if rule.Sequential {
 					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-						err := cmd.Run()
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
-							return
+						exitCode, _ := runCommand(cmd)
+						if exitCode != 0 {
+							errOccurred.Store(true)
 						}
 					}
 					continue
 				}
+				wg.Add(1)
 				go func(cmd string) {
+					defer wg.Done()
 					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-						err := cmd.Run()
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "error running command %q: %s\n", cmd, err)
-							return
+						exitCode, _ := runCommand(cmd)
+						if exitCode != 0 {
+							errOccurred.Store(true)
 						}
 					}
 				}(cmd)
 			}
+			wg.Wait()
+			if errOccurred.Load() {
+				runPostCommands(rule.OnFailure)
+			} else {
+				runPostCommands(rule.OnSuccess)
+			}
 		}(rule)
+	}
+}
+
+func runCommand(cmd *exec.Cmd) (int, error) {
+	err := cmd.Run()
+	if err == nil {
+		return 0, nil
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode(), err
+	}
+
+	// non-exit errors (e.g., command not found)
+	return -1, err
+}
+
+func runPostCommands(cmds []string) {
+	for _, cmd := range cmds {
+		if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+			_, _ = runCommand(cmd)
+		}
 	}
 }
 

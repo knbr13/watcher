@@ -3,10 +3,13 @@ package main
 import "gopkg.in/yaml.v3"
 
 type Rule struct {
-	Pattern    string   `yaml:"pattern"`
 	Commands   []string `yaml:"commands"`
+	OnSuccess  []string `yaml:"on_success"`
+	OnFailure  []string `yaml:"on_failure"`
+	Pattern    string   `yaml:"pattern"`
 	Sequential bool     `yaml:"sequential"`
 }
+
 
 type CommandsFile struct {
 	Write  []Rule `yaml:"write"`
