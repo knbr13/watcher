@@ -2,31 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/fsnotify/fsnotify"
 	"github.com/google/shlex"
 )
-
-func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "watch error: %s\n", err.Error())
-			return nil
-		}
-		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
-			return nil
-		}
-		return watcher.Add(path)
-	})
-	return err
-}
 
 func parseCommand(cmd string) *exec.Cmd {
 	cmd = strings.TrimSpace(cmd)

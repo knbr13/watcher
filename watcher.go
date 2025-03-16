@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -82,4 +85,18 @@ func handleEvent(rules []Rule, fName string) {
 			}
 		}(rule)
 	}
+}
+
+func addPathRecursively(watcher *fsnotify.Watcher, root string) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "watch error: %s\n", err.Error())
+			return nil
+		}
+		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
+			return nil
+		}
+		return watcher.Add(path)
+	})
+	return err
 }
