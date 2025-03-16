@@ -11,8 +11,9 @@ type args struct {
 }
 
 type Rule struct {
-	Pattern  string   `yaml:"pattern"`
-	Commands []string `yaml:"commands"`
+	Pattern    string   `yaml:"pattern"`
+	Commands   []string `yaml:"commands"`
+	Sequential bool     `yaml:"sequential"`
 }
 
 type CommandsFile struct {
