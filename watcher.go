@@ -69,9 +69,10 @@ func handleEvent(rules []Rule, fName string) {
 			var wg sync.WaitGroup
 			var errOccurred atomic.Bool
 			for _, cmd := range rule.Commands {
+				timeout, _ := time.ParseDuration(rule.Timeout.String())
 				if rule.Sequential {
 					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-						exitCode, _ := runCommand(cmd)
+						exitCode, _ := runCommand(cmd, timeout)
 						if exitCode != 0 {
 							errOccurred.Store(true)
 						}
@@ -82,7 +83,7 @@ func handleEvent(rules []Rule, fName string) {
 				go func(cmd string) {
 					defer wg.Done()
 					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-						exitCode, _ := runCommand(cmd)
+						exitCode, _ := runCommand(cmd, timeout)
 						if exitCode != 0 {
 							errOccurred.Store(true)
 						}
@@ -99,25 +100,52 @@ func handleEvent(rules []Rule, fName string) {
 	}
 }
 
-func runCommand(cmd *exec.Cmd) (int, error) {
-	err := cmd.Run()
-	if err == nil {
-		return 0, nil
+func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
+	if timeout <= 0 {
+		err := cmd.Run()
+		if err == nil {
+			return 0, nil
+		}
+
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode(), err
+		}
+
+		// non-exit errors (e.g., command not found)
+		return -1, err
 	}
 
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return exitErr.ExitCode(), err
+	if err := cmd.Start(); err != nil {
+		return -1, err
 	}
 
-	// non-exit errors (e.g., command not found)
-	return -1, err
+	done := make(chan error)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			return 0, nil
+		}
+
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode(), err
+		}
+		return -1, err
+
+	case <-time.After(timeout):
+		cmd.Process.Kill()
+		<-done
+		return -1, fmt.Errorf("command timed out after %v", timeout)
+	}
 }
 
 func runPostCommands(cmds []string) {
 	for _, cmd := range cmds {
 		if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
-			_, _ = runCommand(cmd)
+			_, _ = runCommand(cmd, 0)
 		}
 	}
 }
