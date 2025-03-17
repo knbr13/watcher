@@ -1,15 +1,19 @@
 package main
 
-import "gopkg.in/yaml.v3"
+import (
+	"time"
+
+	"gopkg.in/yaml.v3"
+)
 
 type Rule struct {
-	Commands   []string `yaml:"commands"`
-	OnSuccess  []string `yaml:"on_success"`
-	OnFailure  []string `yaml:"on_failure"`
-	Pattern    string   `yaml:"pattern"`
-	Sequential bool     `yaml:"sequential"`
+	Commands   []string      `yaml:"commands"`
+	OnSuccess  []string      `yaml:"on_success"`
+	OnFailure  []string      `yaml:"on_failure"`
+	Pattern    string        `yaml:"pattern"`
+	Sequential bool          `yaml:"sequential"`
+	Timeout    time.Duration `yaml:"timeout"`
 }
-
 
 type CommandsFile struct {
 	Write  []Rule `yaml:"write"`
