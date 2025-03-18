@@ -194,9 +194,10 @@ write:
 ## Command Line Options ⚙️
 
 ```text
---file, -f     Configuration file (required)
---path, -p     Directory to watch (default: current)
---recursive, -r Watch directories recursively
+-f, --file        Configuration file (required)
+-p, --path        Directory to watch (default: current)
+-d, --debug       Enable debug-level logs
+-r, --recursive   Watch directories recursively
 ```
 
 ## Acknowledgements 💛
