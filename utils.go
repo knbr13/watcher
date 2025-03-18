@@ -6,15 +6,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"path/filepath"
+	"time"
+
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/shlex"
-)
-
-// Add to imports
-import (
-	"path/filepath"
-	"time"
 )
 
 func expandVars(cmd string, event fsnotify.Event) string {
@@ -25,13 +22,12 @@ func expandVars(cmd string, event fsnotify.Event) string {
 	return os.Expand(cmd, func(key string) string {
 		switch key {
 		case "FILE":
-			return event.Name
+			return abs
+
 		case "FILE_BASE":
 			return base
 		case "FILE_DIR":
 			return dir
-		case "FILE_ABS":
-			return abs
 		case "FILE_EXT":
 			return filepath.Ext(event.Name)
 
