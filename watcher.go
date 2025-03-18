@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -53,7 +52,7 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 			if !ok {
 				return
 			}
-			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
+			fmt.Fprintf(logger, "watcher: error: %s\n", err.Error())
 		}
 	}
 }
@@ -68,11 +67,17 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 			}
 			var wg sync.WaitGroup
 			var errOccurred atomic.Bool
-			for _, cmd := range rule.Commands {
-				timeout, _ := time.ParseDuration(rule.Timeout.String())
+			for _, cmdStr := range rule.Commands {
+				timeout, err := time.ParseDuration(rule.Timeout.String())
+				if err != nil {
+					fmt.Fprintf(logger, "watcher: error parsing timeout: %s\n", err.Error())
+				}
 				if rule.Sequential {
-					if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
-						exitCode, _ := runCommand(cmd, timeout)
+					if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+						exitCode, err := runCommand(cmd, timeout)
+						if err != nil {
+							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
+						}
 						if exitCode != 0 {
 							errOccurred.Store(true)
 						}
@@ -80,15 +85,18 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 					continue
 				}
 				wg.Add(1)
-				go func(cmd string) {
+				go func(cmdStr string) {
 					defer wg.Done()
-					if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
-						exitCode, _ := runCommand(cmd, timeout)
+					if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+						exitCode, err := runCommand(cmd, timeout)
+						if err != nil {
+							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
+						}
 						if exitCode != 0 {
 							errOccurred.Store(true)
 						}
 					}
-				}(cmd)
+				}(cmdStr)
 			}
 			wg.Wait()
 			if errOccurred.Load() {
@@ -143,9 +151,12 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 }
 
 func runPostCommands(cmds []string, event fsnotify.Event) {
-	for _, cmd := range cmds {
-		if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
-			_, _ = runCommand(cmd, 0)
+	for _, cmdStr := range cmds {
+		if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+			_, err := runCommand(cmd, 0)
+			if err != nil {
+				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmdStr, err.Error())
+			}
 		}
 	}
 }
@@ -153,7 +164,7 @@ func runPostCommands(cmds []string, event fsnotify.Event) {
 func addPathRecursively(watcher *fsnotify.Watcher, root string) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "watch error: %s\n", err.Error())
+			fmt.Fprintf(logger, "watcher: watch error: %s\n", err.Error())
 			return nil
 		}
 		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
