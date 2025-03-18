@@ -7,16 +7,59 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/fsnotify/fsnotify"
 	"github.com/google/shlex"
 )
 
-func parseCommand(cmd string) *exec.Cmd {
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
+// Add to imports
+import (
+	"path/filepath"
+	"time"
+)
+
+func expandVars(cmd string, event fsnotify.Event) string {
+	base := filepath.Base(event.Name)
+	dir := filepath.Dir(event.Name)
+	abs, _ := filepath.Abs(event.Name)
+
+	return os.Expand(cmd, func(key string) string {
+		switch key {
+		case "FILE":
+			return event.Name
+		case "FILE_BASE":
+			return base
+		case "FILE_DIR":
+			return dir
+		case "FILE_ABS":
+			return abs
+		case "FILE_EXT":
+			return filepath.Ext(event.Name)
+
+		case "EVENT_TYPE":
+			return event.Op.String()
+		case "EVENT_TIME":
+			return time.Now().Format(time.RFC3339)
+
+		case "PWD":
+			wd, _ := os.Getwd()
+			return wd
+		case "TIMESTAMP":
+			return fmt.Sprintf("%d", time.Now().Unix())
+
+		default:
+			return os.Getenv(key)
+		}
+	})
+}
+
+func parseCommand(cmdTemplate string, event fsnotify.Event) *exec.Cmd {
+	expanded := expandVars(cmdTemplate, event)
+	expanded = strings.TrimSpace(expanded)
+	if expanded == "" {
 		return nil
 	}
 
-	parts, err := shlex.Split(cmd)
+	parts, err := shlex.Split(expanded)
 	if err != nil || len(parts) == 0 {
 		return nil
 	}
