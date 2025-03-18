@@ -151,11 +151,11 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 }
 
 func runPostCommands(cmds []string, event fsnotify.Event) {
-	for _, cmd := range cmds {
-		if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
+	for _, cmdStr := range cmds {
+		if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
 			_, err := runCommand(cmd, 0)
 			if err != nil {
-				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmd, err.Error())
+				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmdStr, err.Error())
 			}
 		}
 	}
