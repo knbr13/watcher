@@ -33,21 +33,19 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 				continue
 			}
 
-			fName := filepath.Base(event.Name)
-
 			switch event.Op.String() {
 			case fsnotify.Write.String():
-				handleEvent(cf.Write, fName)
+				handleEvent(cf.Write, event)
 			case fsnotify.Create.String():
-				handleEvent(cf.Create, fName)
+				handleEvent(cf.Create, event)
 			case fsnotify.Remove.String():
-				handleEvent(cf.Remove, fName)
+				handleEvent(cf.Remove, event)
 			case fsnotify.Rename.String():
-				handleEvent(cf.Rename, fName)
+				handleEvent(cf.Rename, event)
 			case fsnotify.Chmod.String():
-				handleEvent(cf.Chmod, fName)
+				handleEvent(cf.Chmod, event)
 			}
-			handleEvent(cf.Common, fName)
+			handleEvent(cf.Common, event)
 
 			eventTime = time.Now()
 			lastEvent = event.Op
@@ -60,7 +58,9 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 	}
 }
 
-func handleEvent(rules []Rule, fName string) {
+func handleEvent(rules []Rule, event fsnotify.Event) {
+	fName := filepath.Base(event.Name)
+
 	for _, rule := range rules {
 		go func(rule Rule) {
 			if !matchesPattern(fName, rule.Pattern) {
@@ -71,7 +71,7 @@ func handleEvent(rules []Rule, fName string) {
 			for _, cmd := range rule.Commands {
 				timeout, _ := time.ParseDuration(rule.Timeout.String())
 				if rule.Sequential {
-					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
 						exitCode, _ := runCommand(cmd, timeout)
 						if exitCode != 0 {
 							errOccurred.Store(true)
@@ -82,7 +82,7 @@ func handleEvent(rules []Rule, fName string) {
 				wg.Add(1)
 				go func(cmd string) {
 					defer wg.Done()
-					if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
 						exitCode, _ := runCommand(cmd, timeout)
 						if exitCode != 0 {
 							errOccurred.Store(true)
@@ -92,9 +92,9 @@ func handleEvent(rules []Rule, fName string) {
 			}
 			wg.Wait()
 			if errOccurred.Load() {
-				runPostCommands(rule.OnFailure)
+				runPostCommands(rule.OnFailure, event)
 			} else {
-				runPostCommands(rule.OnSuccess)
+				runPostCommands(rule.OnSuccess, event)
 			}
 		}(rule)
 	}
@@ -142,9 +142,9 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 	}
 }
 
-func runPostCommands(cmds []string) {
+func runPostCommands(cmds []string, event fsnotify.Event) {
 	for _, cmd := range cmds {
-		if cmd := wrapCmd(parseCommand(cmd)); cmd != nil {
+		if cmd := wrapCmd(parseCommand(cmd, event)); cmd != nil {
 			_, _ = runCommand(cmd, 0)
 		}
 	}
