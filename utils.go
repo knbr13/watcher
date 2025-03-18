@@ -17,13 +17,15 @@ import (
 func expandVars(cmd string, event fsnotify.Event) string {
 	base := filepath.Base(event.Name)
 	dir := filepath.Dir(event.Name)
-	abs, _ := filepath.Abs(event.Name)
+	abs, err := filepath.Abs(event.Name)
+	if err != nil {
+		fmt.Fprintf(logger, "watcher: error getting absolute path of %q: %s\n", event.Name, err.Error())
+	}
 
 	return os.Expand(cmd, func(key string) string {
 		switch key {
 		case "FILE":
 			return abs
-
 		case "FILE_BASE":
 			return base
 		case "FILE_DIR":
@@ -37,7 +39,10 @@ func expandVars(cmd string, event fsnotify.Event) string {
 			return time.Now().Format(time.RFC3339)
 
 		case "PWD":
-			wd, _ := os.Getwd()
+			wd, err := os.Getwd()
+			if err != nil {
+				fmt.Fprintf(logger, "watcher: error getting current working directory: %s\n", err.Error())
+			}
 			return wd
 		case "TIMESTAMP":
 			return fmt.Sprintf("%d", time.Now().Unix())
@@ -77,7 +82,7 @@ func wrapCmd(cmd *exec.Cmd) *exec.Cmd {
 func matchesPattern(path, pattern string) bool {
 	matched, err := doublestar.Match(pattern, path)
 	if err != nil {
-		fmt.Printf("error matching pattern %q: %s\n", pattern, err.Error())
+		fmt.Fprintf(logger, "watcher: error matching pattern %q: %s\n", pattern, err.Error())
 		return false
 	}
 	return matched
