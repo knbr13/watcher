@@ -21,8 +21,8 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
-	eventTime := time.Now()
-	var lastEvent fsnotify.Op
+	eventTimes := make(map[string]time.Time)
+	lastOps := make(map[string]fsnotify.Op)
 
 	for {
 		select {
@@ -30,7 +30,7 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 			if !ok {
 				return
 			}
-			if !(time.Since(eventTime) > (time.Millisecond*400) || lastEvent != event.Op) {
+			if !(time.Since(eventTimes[event.Name]) > cf.Debounce || lastOps[event.Name] != event.Op) {
 				continue
 			}
 
@@ -63,8 +63,8 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 			}
 			handleEvent(cf.Common, event)
 
-			eventTime = time.Now()
-			lastEvent = event.Op
+			eventTimes[event.Name] = time.Now()
+			lastOps[event.Name] = event.Op
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return

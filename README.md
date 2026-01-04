@@ -60,10 +60,23 @@ write:
 watcher --file watcher.yaml --recursive
 ```
 
+## CLI Options 🛠️
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--file` | `-f` | path to configuration file (required) | |
+| `--path` | `-p` | path to watch | `.` |
+| `--recursive` | `-r` | watch directories recursively | `false` |
+| `--debounce` | `-b` | debounce interval (e.g., `400ms`, `1s`) | `400ms` |
+| `--debug` | `-d` | enable debug logging | `false` |
+
 ## Configuration Guide 📋
 
 ### Example Config
 ```yaml
+# Global settings
+debounce: 500ms      # Debounce interval (default: 400ms)
+
 # Global hooks
 on_success: "echo 'All systems go! 🚀'"
 on_failure: "curl -X POST https://api.status.io/down"
