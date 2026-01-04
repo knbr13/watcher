@@ -3,11 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +12,12 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
+// fmt.Println("👀  Watcher v0.1.0")
+// fmt.Printf("📂  Path: %s\n", opt.path)
+// fmt.Printf("🔍  Events: %v\n", opt.registredEvents)
+// fmt.Printf("🔄  Recursive: %v\n", opt.recursive)
+
+func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
@@ -32,16 +34,31 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 				continue
 			}
 
-			switch event.Op.String() {
-			case fsnotify.Write.String():
+			// Global Path filtering
+			relPath, err := filepath.Rel(rootPath, event.Name)
+			if err != nil {
+				relPath = event.Name
+			}
+
+			include := cf.Include
+			if len(include) == 0 {
+				include = cf.Watch
+			}
+
+			if !shouldProcess(relPath, include, cf.Exclude) {
+				continue
+			}
+
+			switch event.Op {
+			case fsnotify.Write:
 				handleEvent(cf.Write, event)
-			case fsnotify.Create.String():
+			case fsnotify.Create:
 				handleEvent(cf.Create, event)
-			case fsnotify.Remove.String():
+			case fsnotify.Remove:
 				handleEvent(cf.Remove, event)
-			case fsnotify.Rename.String():
+			case fsnotify.Rename:
 				handleEvent(cf.Rename, event)
-			case fsnotify.Chmod.String():
+			case fsnotify.Chmod:
 				handleEvent(cf.Chmod, event)
 			}
 			handleEvent(cf.Common, event)
@@ -58,22 +75,17 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile) {
 }
 
 func handleEvent(rules []Rule, event fsnotify.Event) {
-	fName := filepath.Base(event.Name)
-
 	for _, rule := range rules {
 		go func(rule Rule) {
-			if !matchesPattern(fName, rule.Pattern) {
+			if !matchesPattern(event.Name, rule.Pattern) {
 				return
 			}
 			var wg sync.WaitGroup
 			var errOccurred atomic.Bool
 			for _, cmdStr := range rule.Commands {
-				timeout, err := time.ParseDuration(rule.Timeout.String())
-				if err != nil {
-					fmt.Fprintf(logger, "watcher: error parsing timeout: %s\n", err.Error())
-				}
+				timeout := rule.Timeout
 				if rule.Sequential {
-					if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
 						exitCode, err := runCommand(cmd, timeout)
 						if err != nil {
 							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
@@ -87,7 +99,7 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 				wg.Add(1)
 				go func(cmdStr string) {
 					defer wg.Done()
-					if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
 						exitCode, err := runCommand(cmd, timeout)
 						if err != nil {
 							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
@@ -152,25 +164,11 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 
 func runPostCommands(cmds []string, event fsnotify.Event) {
 	for _, cmdStr := range cmds {
-		if cmd := wrapCmd(parseCommand(cmdStr, event)); cmd != nil {
+		if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
 			_, err := runCommand(cmd, 0)
 			if err != nil {
 				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmdStr, err.Error())
 			}
 		}
 	}
-}
-
-func addPathRecursively(watcher *fsnotify.Watcher, root string) error {
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fmt.Fprintf(logger, "watcher: watch error: %s\n", err.Error())
-			return nil
-		}
-		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
-			return nil
-		}
-		return watcher.Add(path)
-	})
-	return err
 }

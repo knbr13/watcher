@@ -2,90 +2,85 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 
-	"path/filepath"
-	"time"
-
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
-	"github.com/google/shlex"
 )
 
-func expandVars(cmd string, event fsnotify.Event) string {
-	base := filepath.Base(event.Name)
-	dir := filepath.Dir(event.Name)
-	abs, err := filepath.Abs(event.Name)
-	if err != nil {
-		fmt.Fprintf(logger, "watcher: error getting absolute path of %q: %s\n", event.Name, err.Error())
-	}
-
-	return os.Expand(cmd, func(key string) string {
-		switch key {
-		case "FILE":
-			return abs
-		case "FILE_BASE":
-			return base
-		case "FILE_DIR":
-			return dir
-		case "FILE_EXT":
-			return filepath.Ext(event.Name)
-
-		case "EVENT_TYPE":
-			return event.Op.String()
-		case "EVENT_TIME":
-			return time.Now().Format(time.RFC3339)
-
-		case "PWD":
-			wd, err := os.Getwd()
-			if err != nil {
-				fmt.Fprintf(logger, "watcher: error getting current working directory: %s\n", err.Error())
-			}
-			return wd
-		case "TIMESTAMP":
-			return fmt.Sprintf("%d", time.Now().Unix())
-
-		default:
-			return os.Getenv(key)
+func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
+		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
+			return nil
+		}
+		return watcher.Add(path)
 	})
+	return err
 }
 
-func parseCommand(cmdTemplate string, event fsnotify.Event) *exec.Cmd {
-	expanded := expandVars(cmdTemplate, event)
-	expanded = strings.TrimSpace(expanded)
-	if expanded == "" {
+func parseCommand(cmd string) *exec.Cmd {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
 		return nil
 	}
-
-	parts, err := shlex.Split(expanded)
-	if err != nil || len(parts) == 0 {
-		return nil
-	}
-
-	if len(parts) == 1 {
-		return exec.Command(parts[0])
-	}
-	return exec.Command(parts[0], parts[1:]...)
+	return exec.Command("sh", "-c", cmd)
 }
 
-func wrapCmd(cmd *exec.Cmd) *exec.Cmd {
+func wrapCmd(cmd *exec.Cmd, event fsnotify.Event) *exec.Cmd {
 	if cmd != nil {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("WATCHER_EVENT=%s", event.Op),
+			fmt.Sprintf("WATCHER_PATH=%s", event.Name),
+		)
 	}
 	return cmd
 }
 
-func matchesPattern(path, pattern string) bool {
-	matched, err := doublestar.Match(pattern, path)
-	if err != nil {
-		fmt.Fprintf(logger, "watcher: error matching pattern %q: %s\n", pattern, err.Error())
+func shouldProcess(path string, include, exclude []string) bool {
+	// Check exclude first
+	if matches(path, exclude) {
 		return false
 	}
-	return matched
+
+	// If include is empty, everything is included
+	if len(include) == 0 {
+		return true
+	}
+
+	return matches(path, include)
+}
+
+func matches(path string, patterns []string) bool {
+	for _, p := range patterns {
+		if matchesPattern(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesPattern(path, pattern string) bool {
+	if pattern == "" {
+		return true
+	}
+	// Try matching the full path
+	if m, _ := filepath.Match(pattern, path); m {
+		return true
+	}
+	// Try matching the base name
+	if m, _ := filepath.Match(pattern, filepath.Base(path)); m {
+		return true
+	}
+	return false
 }
 
 var excludedFolders = []string{
