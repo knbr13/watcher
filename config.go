@@ -16,12 +16,15 @@ type Rule struct {
 }
 
 type CommandsFile struct {
-	Write  []Rule `yaml:"write"`
-	Chmod  []Rule `yaml:"chmod"`
-	Rename []Rule `yaml:"rename"`
-	Remove []Rule `yaml:"remove"`
-	Create []Rule `yaml:"create"`
-	Common []Rule `yaml:"common"`
+	Include []string `yaml:"include"`
+	Watch   []string `yaml:"watch"`
+	Exclude []string `yaml:"exclude"`
+	Write   []Rule   `yaml:"write"`
+	Chmod   []Rule   `yaml:"chmod"`
+	Rename  []Rule   `yaml:"rename"`
+	Remove  []Rule   `yaml:"remove"`
+	Create  []Rule   `yaml:"create"`
+	Common  []Rule   `yaml:"common"`
 }
 
 func (c *CommandsFile) Parse(data []byte) error {

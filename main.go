@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/alexflint/go-arg"
 	"github.com/fsnotify/fsnotify"
@@ -60,7 +62,7 @@ func main() {
 	defer watcher.Close()
 
 	if args.Recursive {
-		err = addPathRecursively(watcher, args.Path)
+		err = addPathRecursively(args.Path, watcher)
 	} else {
 		err = watcher.Add(args.Path)
 	}
@@ -68,5 +70,15 @@ func main() {
 		fatalf("watcher: error: %s\n", err.Error())
 	}
 
-	watchEvents(watcher, *c)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Println("\n👋  Shutting down watcher...")
+		watcher.Close()
+		os.Exit(0)
+	}()
+
+	watchEvents(watcher, *c, args.Path)
 }
