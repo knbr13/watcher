@@ -94,6 +94,29 @@ create:
     commands: ["convert $FILE -resize 50% resized/$FILE_BASE"]
 ```
 
+### Command Placeholders 🧩
+
+In addition to environment variables, you can use Go `text/template` style placeholders for dynamic command expansion:
+
+| Placeholder      | Description                      |
+|------------------|----------------------------------|
+| `{{.Path}}`      | Full path to changed file        |
+| `{{.Base}}`      | Filename only (e.g., `app.go`)   |
+| `{{.Dir}}`       | Parent directory of file         |
+| `{{.Ext}}`       | The extension of the file        |
+| `{{.Op}}`        | Event type (`WRITE`, `CREATE`)   |
+| `{{.Time}}`      | RFC3339 formatted time           |
+| `{{.Timestamp}}` | Unix timestamp of event          |
+| `{{.PWD}}`       | Current working directory        |
+
+Example:
+```yaml
+write:
+  - pattern: "src/**/*.go"
+    commands:
+      - echo "File {{.Base}} was modified in {{.Dir}} at {{.Time}}"
+```
+
 ### Environment Variables 🌍
 
 | Variable       | Description                      |

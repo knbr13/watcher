@@ -103,3 +103,61 @@ func TestMatchesPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandTemplate(t *testing.T) {
+	data := EventData{
+		Path:      "/home/user/project/main.go",
+		Base:      "main.go",
+		Dir:       "/home/user/project",
+		Ext:       ".go",
+		Op:        "WRITE",
+		Time:      "2023-01-01T00:00:00Z",
+		Timestamp: 1672531200,
+		PWD:       "/home/user/project",
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		expected string
+	}{
+		{
+			name:     "no placeholders",
+			template: "echo hello",
+			expected: "echo hello",
+		},
+		{
+			name:     "path placeholder",
+			template: "echo {{.Path}}",
+			expected: "echo /home/user/project/main.go",
+		},
+		{
+			name:     "multiple placeholders",
+			template: "echo {{.Base}} in {{.Dir}}",
+			expected: "echo main.go in /home/user/project",
+		},
+		{
+			name:     "operation placeholder",
+			template: "Event: {{.Op}}",
+			expected: "Event: WRITE",
+		},
+		{
+			name:     "timestamp placeholder",
+			template: "at {{.Timestamp}}",
+			expected: "at 1672531200",
+		},
+		{
+			name:     "invalid template",
+			template: "echo {{.Invalid}}",
+			expected: "echo {{.Invalid}}", // Should return original on error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := expandTemplate(tt.template, data); got != tt.expected {
+				t.Errorf("expandTemplate() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
