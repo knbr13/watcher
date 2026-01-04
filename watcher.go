@@ -80,12 +80,14 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 			if !matchesPattern(event.Name, rule.Pattern) {
 				return
 			}
+			data := getEventData(event)
 			var wg sync.WaitGroup
 			var errOccurred atomic.Bool
 			for _, cmdStr := range rule.Commands {
+				cmdStr = expandTemplate(cmdStr, data)
 				timeout := rule.Timeout
 				if rule.Sequential {
-					if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
 						exitCode, err := runCommand(cmd, timeout)
 						if err != nil {
 							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
@@ -99,7 +101,7 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 				wg.Add(1)
 				go func(cmdStr string) {
 					defer wg.Done()
-					if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
+					if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
 						exitCode, err := runCommand(cmd, timeout)
 						if err != nil {
 							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
@@ -112,9 +114,9 @@ func handleEvent(rules []Rule, event fsnotify.Event) {
 			}
 			wg.Wait()
 			if errOccurred.Load() {
-				runPostCommands(rule.OnFailure, event)
+				runPostCommands(rule.OnFailure, data)
 			} else {
-				runPostCommands(rule.OnSuccess, event)
+				runPostCommands(rule.OnSuccess, data)
 			}
 		}(rule)
 	}
@@ -162,9 +164,10 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 	}
 }
 
-func runPostCommands(cmds []string, event fsnotify.Event) {
+func runPostCommands(cmds []string, data EventData) {
 	for _, cmdStr := range cmds {
-		if cmd := wrapCmd(parseCommand(cmdStr), event); cmd != nil {
+		cmdStr = expandTemplate(cmdStr, data)
+		if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
 			_, err := runCommand(cmd, 0)
 			if err != nil {
 				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmdStr, err.Error())

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -33,16 +36,68 @@ func parseCommand(cmd string) *exec.Cmd {
 	return exec.Command("sh", "-c", cmd)
 }
 
-func wrapCmd(cmd *exec.Cmd, event fsnotify.Event) *exec.Cmd {
+func wrapCmd(cmd *exec.Cmd, data EventData) *exec.Cmd {
 	if cmd != nil {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Env = append(os.Environ(),
-			fmt.Sprintf("WATCHER_EVENT=%s", event.Op),
-			fmt.Sprintf("WATCHER_PATH=%s", event.Name),
+			fmt.Sprintf("WATCHER_EVENT=%s", data.Op),
+			fmt.Sprintf("WATCHER_PATH=%s", data.Path),
+			fmt.Sprintf("FILE=%s", data.Path),
+			fmt.Sprintf("FILE_BASE=%s", data.Base),
+			fmt.Sprintf("FILE_DIR=%s", data.Dir),
+			fmt.Sprintf("FILE_EXT=%s", data.Ext),
+			fmt.Sprintf("EVENT_TYPE=%s", data.Op),
+			fmt.Sprintf("EVENT_TIME=%s", data.Time),
+			fmt.Sprintf("TIMESTAMP=%d", data.Timestamp),
+			fmt.Sprintf("PWD=%s", data.PWD),
 		)
 	}
 	return cmd
+}
+
+type EventData struct {
+	Path      string
+	Base      string
+	Dir       string
+	Ext       string
+	Op        string
+	Time      string
+	Timestamp int64
+	PWD       string
+}
+
+func getEventData(event fsnotify.Event) EventData {
+	absPath, err := filepath.Abs(event.Name)
+	if err != nil {
+		absPath = event.Name
+	}
+	now := time.Now()
+	pwd, _ := os.Getwd()
+	return EventData{
+		Path:      absPath,
+		Base:      filepath.Base(event.Name),
+		Dir:       filepath.Dir(event.Name),
+		Ext:       filepath.Ext(event.Name),
+		Op:        strings.ToUpper(event.Op.String()),
+		Time:      now.Format(time.RFC3339),
+		Timestamp: now.Unix(),
+		PWD:       pwd,
+	}
+}
+
+func expandTemplate(text string, data EventData) string {
+	tmpl, err := template.New("cmd").Parse(text)
+	if err != nil {
+		fmt.Fprintf(logger, "watcher: error parsing template %q: %s\n", text, err.Error())
+		return text
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		fmt.Fprintf(logger, "watcher: error executing template %q: %s\n", text, err.Error())
+		return text
+	}
+	return buf.String()
 }
 
 func shouldProcess(path string, include, exclude []string) bool {
