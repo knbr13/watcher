@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/fsnotify/fsnotify"
@@ -53,6 +54,13 @@ func main() {
 	err = c.Parse(data)
 	if err != nil {
 		fatalf("watcher: error: %s\n", err.Error())
+	}
+
+	if args.Debounce != 0 {
+		c.Debounce = args.Debounce
+	}
+	if c.Debounce == 0 {
+		c.Debounce = 400 * time.Millisecond
 	}
 
 	watcher, err := fsnotify.NewWatcher()
