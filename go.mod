@@ -1,4 +1,4 @@
-module github.com/knbr13/watcher
+module github.com/aladdin-io/watcher
 
 go 1.25.5
 
