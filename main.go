@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/alexflint/go-arg"
 	"github.com/fsnotify/fsnotify"
 )
+
+// shutdownGracePeriod bounds how long watcher waits for in-flight commands
+// to finish after a shutdown signal before giving up and exiting anyway.
+const shutdownGracePeriod = 10 * time.Second
 
 // version is set at build time via -ldflags "-X main.version=...".
 var version = "dev"
@@ -88,15 +94,30 @@ func main() {
 		fatalf("watcher: error: %s\n", err.Error())
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
 		fmt.Println("\n👋  Shutting down watcher...")
-		watcher.Close()
-		os.Exit(0)
+		cancel()
 	}()
 
-	watchEvents(watcher, *c, args.Path)
+	watchEvents(ctx, watcher, *c, args.Path, &wg)
+
+	drained := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+	case <-time.After(shutdownGracePeriod):
+		fmt.Fprintf(os.Stderr, "watcher: warning: commands still running after %v grace period, exiting anyway\n", shutdownGracePeriod)
+	}
 }

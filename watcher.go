@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -17,7 +18,7 @@ import (
 // fmt.Printf("🔍  Events: %v\n", opt.registredEvents)
 // fmt.Printf("🔄  Recursive: %v\n", opt.recursive)
 
-func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
+func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile, rootPath string, wg *sync.WaitGroup) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
@@ -26,6 +27,8 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return
@@ -51,17 +54,17 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 
 			switch event.Op {
 			case fsnotify.Write:
-				handleEvent(cf.Write, event)
+				handleEvent(ctx, wg, cf.Write, event)
 			case fsnotify.Create:
-				handleEvent(cf.Create, event)
+				handleEvent(ctx, wg, cf.Create, event)
 			case fsnotify.Remove:
-				handleEvent(cf.Remove, event)
+				handleEvent(ctx, wg, cf.Remove, event)
 			case fsnotify.Rename:
-				handleEvent(cf.Rename, event)
+				handleEvent(ctx, wg, cf.Rename, event)
 			case fsnotify.Chmod:
-				handleEvent(cf.Chmod, event)
+				handleEvent(ctx, wg, cf.Chmod, event)
 			}
-			handleEvent(cf.Common, event)
+			handleEvent(ctx, wg, cf.Common, event)
 
 			eventTimes[event.Name] = time.Now()
 			lastOps[event.Name] = event.Op
@@ -74,75 +77,65 @@ func watchEvents(watcher *fsnotify.Watcher, cf CommandsFile, rootPath string) {
 	}
 }
 
-func handleEvent(rules []Rule, event fsnotify.Event) {
+func handleEvent(ctx context.Context, wg *sync.WaitGroup, rules []Rule, event fsnotify.Event) {
 	for _, rule := range rules {
+		wg.Add(1)
 		go func(rule Rule) {
+			defer wg.Done()
 			if !matchesPattern(event.Name, rule.Pattern) {
 				return
 			}
 			data := getEventData(event)
-			var wg sync.WaitGroup
+			var cmdWg sync.WaitGroup
 			var errOccurred atomic.Bool
+			runOne := func(cmdStr string) {
+				if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
+					exitCode, err := runCommand(ctx, cmd, rule.Timeout)
+					if err != nil {
+						fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
+					}
+					if exitCode != 0 {
+						errOccurred.Store(true)
+					}
+				}
+			}
 			for _, cmdStr := range rule.Commands {
 				cmdStr = expandTemplate(cmdStr, data)
-				timeout := rule.Timeout
 				if rule.Sequential {
-					if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
-						exitCode, err := runCommand(cmd, timeout)
-						if err != nil {
-							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
-						}
-						if exitCode != 0 {
-							errOccurred.Store(true)
-						}
-					}
+					runOne(cmdStr)
 					continue
 				}
-				wg.Add(1)
+				cmdWg.Add(1)
 				go func(cmdStr string) {
-					defer wg.Done()
-					if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
-						exitCode, err := runCommand(cmd, timeout)
-						if err != nil {
-							fmt.Fprintf(logger, "watcher: error running command %q: %s\n", cmdStr, err.Error())
-						}
-						if exitCode != 0 {
-							errOccurred.Store(true)
-						}
-					}
+					defer cmdWg.Done()
+					runOne(cmdStr)
 				}(cmdStr)
 			}
-			wg.Wait()
+			cmdWg.Wait()
 			if errOccurred.Load() {
-				runPostCommands(rule.OnFailure, data)
+				runPostCommands(ctx, rule.OnFailure, data)
 			} else {
-				runPostCommands(rule.OnSuccess, data)
+				runPostCommands(ctx, rule.OnSuccess, data)
 			}
 		}(rule)
 	}
 }
 
-func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
-	if timeout <= 0 {
-		err := cmd.Run()
-		if err == nil {
-			return 0, nil
-		}
-
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode(), err
-		}
-
-		// non-exit errors (e.g., command not found)
-		return -1, err
+// runCommand starts cmd and waits for it to finish, killing the whole
+// process tree if timeout elapses (when timeout > 0) or ctx is canceled
+// first, whichever comes first.
+func runCommand(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) (int, error) {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
 
 	if err := cmd.Start(); err != nil {
 		return -1, err
 	}
 
-	done := make(chan error)
+	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 
 	select {
@@ -155,20 +148,25 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 		if errors.As(err, &exitErr) {
 			return exitErr.ExitCode(), err
 		}
+
+		// non-exit errors (e.g., command not found)
 		return -1, err
 
-	case <-time.After(timeout):
+	case <-ctx.Done():
 		killProcessTree(cmd)
 		<-done
-		return -1, fmt.Errorf("command timed out after %v", timeout)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return -1, fmt.Errorf("command timed out after %v", timeout)
+		}
+		return -1, fmt.Errorf("command canceled: watcher is shutting down")
 	}
 }
 
-func runPostCommands(cmds []string, data EventData) {
+func runPostCommands(ctx context.Context, cmds []string, data EventData) {
 	for _, cmdStr := range cmds {
 		cmdStr = expandTemplate(cmdStr, data)
 		if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
-			_, err := runCommand(cmd, 0)
+			_, err := runCommand(ctx, cmd, 0)
 			if err != nil {
 				fmt.Fprintf(logger, "watcher: error running post command %q: %s\n", cmdStr, err.Error())
 			}
