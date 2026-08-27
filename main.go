@@ -72,6 +72,10 @@ func main() {
 		fatalf("watcher: error: %s\n", err.Error())
 	}
 
+	if err := c.Validate(); err != nil {
+		fatalf("watcher: error: invalid config: %s\n", err.Error())
+	}
+
 	if args.Debounce != 0 {
 		c.Debounce = args.Debounce
 	}

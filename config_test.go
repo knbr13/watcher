@@ -50,3 +50,85 @@ write:
 		t.Errorf("Write rule mismatch")
 	}
 }
+
+func TestParseRejectsUnknownFields(t *testing.T) {
+	yamlData := `
+writ:
+  - pattern: "*.go"
+    commands: ["go build"]
+`
+	var cf CommandsFile
+	if err := cf.Parse([]byte(yamlData)); err == nil {
+		t.Fatal("expected Parse to reject an unknown top-level field, got nil error")
+	}
+}
+
+func TestParseAcceptsKnownFields(t *testing.T) {
+	yamlData := `
+write:
+  - pattern: "*.go"
+    commands: ["go build"]
+`
+	var cf CommandsFile
+	if err := cf.Parse([]byte(yamlData)); err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+}
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		cf      CommandsFile
+		wantErr bool
+	}{
+		{
+			name: "valid config",
+			cf: CommandsFile{
+				Write: []Rule{{Pattern: "*.go", Commands: []string{"go build"}}},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "negative debounce",
+			cf:      CommandsFile{Debounce: -time.Second},
+			wantErr: true,
+		},
+		{
+			name: "empty pattern",
+			cf: CommandsFile{
+				Write: []Rule{{Pattern: "", Commands: []string{"go build"}}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative timeout",
+			cf: CommandsFile{
+				Write: []Rule{{Pattern: "*.go", Commands: []string{"go build"}, Timeout: -time.Second}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty commands",
+			cf: CommandsFile{
+				Write: []Rule{{Pattern: "*.go", Commands: nil}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "blank command entry",
+			cf: CommandsFile{
+				Write: []Rule{{Pattern: "*.go", Commands: []string{"  "}}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cf.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

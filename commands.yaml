@@ -36,3 +36,4 @@ create:
 common:
   - pattern: "*"
     commands:
+      - echo "common event"
