@@ -93,7 +93,7 @@ func main() {
 	if err != nil {
 		fatalf("watcher: error: %s\n", err.Error())
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	if args.Recursive {
 		err = addPathRecursively(args.Path, watcher, opts.ExcludeDirs)

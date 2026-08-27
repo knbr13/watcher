@@ -1,0 +1,27 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - errcheck
+    - misspell
+    - unconvert
+  settings:
+    errcheck:
+      # Best-effort logging to the debug logger (io.Discard unless
+      # --debug); a failed write here isn't actionable.
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -45,7 +45,7 @@ func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile
 				}
 			}
 
-			if !(time.Since(eventTimes[event.Name]) > cf.Debounce || lastOps[event.Name] != event.Op) {
+			if time.Since(eventTimes[event.Name]) <= cf.Debounce && lastOps[event.Name] == event.Op {
 				continue
 			}
 
@@ -169,7 +169,9 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) (int,
 		return -1, err
 
 	case <-ctx.Done():
-		killProcessTree(cmd)
+		if err := killProcessTree(cmd); err != nil {
+			fmt.Fprintf(logger, "watcher: error: failed to kill command process tree: %s\n", err.Error())
+		}
 		<-done
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return -1, fmt.Errorf("command timed out after %v", timeout)
