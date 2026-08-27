@@ -225,6 +225,23 @@ func TestShellQuote(t *testing.T) {
 	}
 }
 
+func TestBuildExcludeDirs(t *testing.T) {
+	merged := buildExcludeDirs([]string{"Custom", "ANOTHER"})
+
+	for _, want := range []string{"node_modules", "vendor", "custom", "another"} {
+		found := false
+		for _, got := range merged {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("buildExcludeDirs() missing %q, got %v", want, merged)
+		}
+	}
+}
+
 func TestExpandTemplateQuoteFunc(t *testing.T) {
 	data := EventData{Base: "; rm -rf ~ #"}
 	got := expandTemplate("echo {{.Base | quote}}", data)

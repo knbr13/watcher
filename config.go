@@ -19,16 +19,17 @@ type Rule struct {
 }
 
 type CommandsFile struct {
-	Debounce time.Duration `yaml:"debounce"`
-	Include  []string      `yaml:"include"`
-	Watch    []string      `yaml:"watch"`
-	Exclude  []string      `yaml:"exclude"`
-	Write    []Rule        `yaml:"write"`
-	Chmod    []Rule        `yaml:"chmod"`
-	Rename   []Rule        `yaml:"rename"`
-	Remove   []Rule        `yaml:"remove"`
-	Create   []Rule        `yaml:"create"`
-	Common   []Rule        `yaml:"common"`
+	Debounce    time.Duration `yaml:"debounce"`
+	Include     []string      `yaml:"include"`
+	Watch       []string      `yaml:"watch"`
+	Exclude     []string      `yaml:"exclude"`
+	ExcludeDirs []string      `yaml:"exclude_dirs"`
+	Write       []Rule        `yaml:"write"`
+	Chmod       []Rule        `yaml:"chmod"`
+	Rename      []Rule        `yaml:"rename"`
+	Remove      []Rule        `yaml:"remove"`
+	Create      []Rule        `yaml:"create"`
+	Common      []Rule        `yaml:"common"`
 }
 
 // Parse decodes a config file, rejecting unknown top-level or rule fields so

@@ -83,6 +83,12 @@ func main() {
 		c.Debounce = 400 * time.Millisecond
 	}
 
+	opts := &runOptions{
+		Recursive:   args.Recursive,
+		ExcludeDirs: buildExcludeDirs(c.ExcludeDirs),
+		DryRun:      args.DryRun,
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		fatalf("watcher: error: %s\n", err.Error())
@@ -90,7 +96,7 @@ func main() {
 	defer watcher.Close()
 
 	if args.Recursive {
-		err = addPathRecursively(args.Path, watcher)
+		err = addPathRecursively(args.Path, watcher, opts.ExcludeDirs)
 	} else {
 		err = watcher.Add(args.Path)
 	}
@@ -111,7 +117,7 @@ func main() {
 		cancel()
 	}()
 
-	watchEvents(ctx, watcher, *c, args.Path, args.Recursive, &wg)
+	watchEvents(ctx, watcher, *c, args.Path, opts, &wg)
 
 	drained := make(chan struct{})
 	go func() {

@@ -19,7 +19,7 @@ import (
 // fmt.Printf("🔍  Events: %v\n", opt.registredEvents)
 // fmt.Printf("🔄  Recursive: %v\n", opt.recursive)
 
-func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile, rootPath string, recursive bool, wg *sync.WaitGroup) {
+func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile, rootPath string, opts *runOptions, wg *sync.WaitGroup) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
@@ -37,9 +37,9 @@ func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile
 
 			// A newly created directory needs its own watch added, or
 			// files created inside it later would go unnoticed.
-			if recursive && event.Op.Has(fsnotify.Create) {
+			if opts.Recursive && event.Op.Has(fsnotify.Create) {
 				if info, statErr := os.Stat(event.Name); statErr == nil && info.IsDir() {
-					if err := addPathRecursively(event.Name, watcher); err != nil {
+					if err := addPathRecursively(event.Name, watcher, opts.ExcludeDirs); err != nil {
 						fmt.Fprintf(logger, "watcher: error: failed to watch new directory %q: %s\n", event.Name, err.Error())
 					}
 				}
@@ -66,17 +66,17 @@ func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile
 
 			switch event.Op {
 			case fsnotify.Write:
-				handleEvent(ctx, wg, cf.Write, event)
+				handleEvent(ctx, wg, cf.Write, event, opts)
 			case fsnotify.Create:
-				handleEvent(ctx, wg, cf.Create, event)
+				handleEvent(ctx, wg, cf.Create, event, opts)
 			case fsnotify.Remove:
-				handleEvent(ctx, wg, cf.Remove, event)
+				handleEvent(ctx, wg, cf.Remove, event, opts)
 			case fsnotify.Rename:
-				handleEvent(ctx, wg, cf.Rename, event)
+				handleEvent(ctx, wg, cf.Rename, event, opts)
 			case fsnotify.Chmod:
-				handleEvent(ctx, wg, cf.Chmod, event)
+				handleEvent(ctx, wg, cf.Chmod, event, opts)
 			}
-			handleEvent(ctx, wg, cf.Common, event)
+			handleEvent(ctx, wg, cf.Common, event, opts)
 
 			eventTimes[event.Name] = time.Now()
 			lastOps[event.Name] = event.Op
@@ -89,7 +89,7 @@ func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile
 	}
 }
 
-func handleEvent(ctx context.Context, wg *sync.WaitGroup, rules []Rule, event fsnotify.Event) {
+func handleEvent(ctx context.Context, wg *sync.WaitGroup, rules []Rule, event fsnotify.Event, opts *runOptions) {
 	for _, rule := range rules {
 		wg.Add(1)
 		go func(rule Rule) {
@@ -101,6 +101,10 @@ func handleEvent(ctx context.Context, wg *sync.WaitGroup, rules []Rule, event fs
 			var cmdWg sync.WaitGroup
 			var errOccurred atomic.Bool
 			runOne := func(cmdStr string) {
+				if opts.DryRun {
+					fmt.Printf("[dry-run] would run: %s\n", cmdStr)
+					return
+				}
 				if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
 					exitCode, err := runCommand(ctx, cmd, rule.Timeout)
 					if err != nil {
@@ -125,9 +129,9 @@ func handleEvent(ctx context.Context, wg *sync.WaitGroup, rules []Rule, event fs
 			}
 			cmdWg.Wait()
 			if errOccurred.Load() {
-				runPostCommands(ctx, rule.OnFailure, data)
+				runPostCommands(ctx, rule.OnFailure, data, opts)
 			} else {
-				runPostCommands(ctx, rule.OnSuccess, data)
+				runPostCommands(ctx, rule.OnSuccess, data, opts)
 			}
 		}(rule)
 	}
@@ -174,9 +178,13 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, timeout time.Duration) (int,
 	}
 }
 
-func runPostCommands(ctx context.Context, cmds []string, data EventData) {
+func runPostCommands(ctx context.Context, cmds []string, data EventData, opts *runOptions) {
 	for _, cmdStr := range cmds {
 		cmdStr = expandTemplate(cmdStr, data)
+		if opts.DryRun {
+			fmt.Printf("[dry-run] would run: %s\n", cmdStr)
+			continue
+		}
 		if cmd := wrapCmd(parseCommand(cmdStr), data); cmd != nil {
 			_, err := runCommand(ctx, cmd, 0)
 			if err != nil {

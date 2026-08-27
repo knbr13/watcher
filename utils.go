@@ -17,13 +17,38 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
+// runOptions bundles the run-time (CLI-derived) settings needed by the event
+// loop and command execution, kept separate from CommandsFile since they
+// come from flags rather than the config file.
+type runOptions struct {
+	Recursive   bool
+	ExcludeDirs []string // lower-cased directory names to never watch/descend into
+	DryRun      bool
+}
+
+// buildExcludeDirs merges the built-in excludedFolders defaults with the
+// user's configured exclude_dirs, lower-cased for case-insensitive matching.
+func buildExcludeDirs(custom []string) []string {
+	merged := make([]string, 0, len(excludedFolders)+len(custom))
+	merged = append(merged, excludedFolders...)
+	for _, d := range custom {
+		merged = append(merged, strings.ToLower(d))
+	}
+	return merged
+}
+
+func addPathRecursively(root string, watcher *fsnotify.Watcher, excludeDirs []string) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() || slices.Contains(excludedFolders, strings.ToLower(d.Name())) {
+		if !d.IsDir() {
 			return nil
+		}
+		// Never skip the root itself, even if its name happens to match an
+		// excluded directory (e.g. the user points --path at "build").
+		if path != root && slices.Contains(excludeDirs, strings.ToLower(d.Name())) {
+			return fs.SkipDir
 		}
 		return watcher.Add(path)
 	})
