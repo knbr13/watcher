@@ -12,20 +12,30 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func init() {
-	fmt.Println(`
-                 _      __ ______ / /_ _____ / /_   ___   _____
-                | | /| / // __  // __// ___// __ \ / _ \ / ___/
-                | |/ |/ // /_/ // /_ / /__ / / / //  __// /    
-                |__/|__/ \____/ \__/ \___//_/ /_/ \___//_/      
-    `)
-}
+// version is set at build time via -ldflags "-X main.version=...".
+var version = "dev"
 
 var logger = io.Discard
 
 func main() {
 	var args args
 	arg.MustParse(&args)
+
+	if args.Version {
+		fmt.Printf("watcher %s\n", version)
+		return
+	}
+
+	fmt.Println(`
+                 _      __ ______ / /_ _____ / /_   ___   _____
+                | | /| / // __  // __// ___// __ \ / _ \ / ___/
+                | |/ |/ // /_/ // /_ / /__ / / / //  __// /
+                |__/|__/ \____/ \__/ \___//_/ /_/ \___//_/
+    `)
+
+	if args.File == "" {
+		fatalf("watcher: error: --file is required\n")
+	}
 
 	if args.Debug {
 		logger = os.Stderr
