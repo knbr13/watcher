@@ -68,6 +68,34 @@ func TestShouldProcess(t *testing.T) {
 			exclude:  []string{"vendor/*"},
 			expected: false,
 		},
+		{
+			name:     "include with negation carves out an exception",
+			path:     "src/testdata/main.go",
+			include:  []string{"**/*.go", "!**/testdata/**"},
+			exclude:  nil,
+			expected: false,
+		},
+		{
+			name:     "include with negation still matches everything else",
+			path:     "src/main.go",
+			include:  []string{"**/*.go", "!**/testdata/**"},
+			exclude:  nil,
+			expected: true,
+		},
+		{
+			name:     "exclude with negation lets a specific file through",
+			path:     "vendor/keep.go",
+			include:  nil,
+			exclude:  []string{"vendor/**", "!vendor/keep.go"},
+			expected: true,
+		},
+		{
+			name:     "brace expansion in include",
+			path:     "uploads/photo.png",
+			include:  []string{"uploads/*.{jpg,png}"},
+			exclude:  nil,
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -93,6 +121,13 @@ func TestMatchesPattern(t *testing.T) {
 		{"base name match in subdir", "src/main.go", "main.go", true},
 		{"subdir match", "src/main.go", "src/*.go", true},
 		{"subdir mismatch", "pkg/main.go", "src/*.go", false},
+		{"doublestar match nested dirs", "src/pkg/deep/main.go", "**/*.go", true},
+		{"doublestar match at root", "main.go", "**/*.go", true},
+		{"brace alternatives match jpg", "photo.jpg", "*.{jpg,png}", true},
+		{"brace alternatives match png", "photo.png", "*.{jpg,png}", true},
+		{"brace alternatives mismatch", "photo.gif", "*.{jpg,png}", false},
+		{"negated pattern excludes match", "main.go", "!*.go", false},
+		{"negated pattern lets non-match through", "main.txt", "!*.go", true},
 	}
 
 	for _, tt := range tests {

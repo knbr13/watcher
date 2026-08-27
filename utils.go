@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -127,25 +128,61 @@ func shouldProcess(path string, include, exclude []string) bool {
 	return matches(path, include)
 }
 
+// matches reports whether path is matched by patterns, treating a leading
+// "!" on any pattern as an exception that always wins for that path (e.g.
+// ["**/*.go", "!**/testdata/**"] matches every .go file except those under
+// testdata). A patterns list containing only negations is treated as
+// "everything except these".
 func matches(path string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+
+	hasPositive := false
+	matched := false
+	excluded := false
 	for _, p := range patterns {
-		if matchesPattern(path, p) {
-			return true
+		if negated, ok := strings.CutPrefix(p, "!"); ok {
+			if globMatch(path, negated) {
+				excluded = true
+			}
+			continue
+		}
+		hasPositive = true
+		if globMatch(path, p) {
+			matched = true
 		}
 	}
-	return false
+	if !hasPositive {
+		matched = true
+	}
+	return matched && !excluded
 }
 
+// matchesPattern matches a single rule pattern against path, honoring an
+// optional leading "!" to negate the match.
 func matchesPattern(path, pattern string) bool {
 	if pattern == "" {
 		return true
 	}
-	// Try matching the full path
-	if m, _ := filepath.Match(pattern, path); m {
+	if negated, ok := strings.CutPrefix(pattern, "!"); ok {
+		return !globMatch(path, negated)
+	}
+	return globMatch(path, pattern)
+}
+
+// globMatch matches path (or its base name) against a doublestar pattern,
+// which supports "**", "?", character classes, and "{a,b}" alternatives.
+func globMatch(path, pattern string) bool {
+	if pattern == "" {
 		return true
 	}
-	// Try matching the base name
-	if m, _ := filepath.Match(pattern, filepath.Base(path)); m {
+	path = filepath.ToSlash(path)
+	pattern = filepath.ToSlash(pattern)
+	if m, _ := doublestar.Match(pattern, path); m {
+		return true
+	}
+	if m, _ := doublestar.Match(pattern, filepath.Base(path)); m {
 		return true
 	}
 	return false
