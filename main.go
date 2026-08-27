@@ -107,7 +107,7 @@ func main() {
 		cancel()
 	}()
 
-	watchEvents(ctx, watcher, *c, args.Path, &wg)
+	watchEvents(ctx, watcher, *c, args.Path, args.Recursive, &wg)
 
 	drained := make(chan struct{})
 	go func() {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -18,7 +19,7 @@ import (
 // fmt.Printf("🔍  Events: %v\n", opt.registredEvents)
 // fmt.Printf("🔄  Recursive: %v\n", opt.recursive)
 
-func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile, rootPath string, wg *sync.WaitGroup) {
+func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile, rootPath string, recursive bool, wg *sync.WaitGroup) {
 	if watcher == nil {
 		panic("watcher is nil!")
 	}
@@ -33,6 +34,17 @@ func watchEvents(ctx context.Context, watcher *fsnotify.Watcher, cf CommandsFile
 			if !ok {
 				return
 			}
+
+			// A newly created directory needs its own watch added, or
+			// files created inside it later would go unnoticed.
+			if recursive && event.Op.Has(fsnotify.Create) {
+				if info, statErr := os.Stat(event.Name); statErr == nil && info.IsDir() {
+					if err := addPathRecursively(event.Name, watcher); err != nil {
+						fmt.Fprintf(logger, "watcher: error: failed to watch new directory %q: %s\n", event.Name, err.Error())
+					}
+				}
+			}
+
 			if !(time.Since(eventTimes[event.Name]) > cf.Debounce || lastOps[event.Name] != event.Op) {
 				continue
 			}
