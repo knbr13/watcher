@@ -1,6 +1,8 @@
 package main
 
 import (
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -194,5 +196,40 @@ func TestExpandTemplate(t *testing.T) {
 				t.Errorf("expandTemplate() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	tests := []string{
+		"plain",
+		"with space",
+		"it's got a quote",
+		`"double quoted"`,
+		"; rm -rf / #",
+		"$(whoami)",
+		"back`tick`",
+	}
+	for _, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			got := shellQuote(s)
+			var want string
+			if runtime.GOOS == "windows" {
+				want = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+			} else {
+				want = `'` + strings.ReplaceAll(s, `'`, `'\''`) + `'`
+			}
+			if got != want {
+				t.Errorf("shellQuote(%q) = %q, want %q", s, got, want)
+			}
+		})
+	}
+}
+
+func TestExpandTemplateQuoteFunc(t *testing.T) {
+	data := EventData{Base: "; rm -rf ~ #"}
+	got := expandTemplate("echo {{.Base | quote}}", data)
+	want := "echo " + shellQuote(data.Base)
+	if got != want {
+		t.Errorf("expandTemplate with quote = %q, want %q", got, want)
 	}
 }

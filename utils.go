@@ -100,8 +100,23 @@ func getEventData(event fsnotify.Event) EventData {
 	}
 }
 
+// shellQuote quotes s so it is safe to splice into the shell command
+// selected by parseCommand as a single literal argument, regardless of what
+// characters s contains (e.g. a filename crafted to break out of the
+// command). Intended for use as the "quote" template function, e.g.
+// {{.Base | quote}}.
+func shellQuote(s string) string {
+	if runtime.GOOS == "windows" {
+		// cmd.exe has no fully safe quoting story (e.g. "%...%" is still
+		// expanded inside double quotes), but this neutralizes the common
+		// case of quotes/spaces/metacharacters in a file name.
+		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+	}
+	return `'` + strings.ReplaceAll(s, `'`, `'\''`) + `'`
+}
+
 func expandTemplate(text string, data EventData) string {
-	tmpl, err := template.New("cmd").Parse(text)
+	tmpl, err := template.New("cmd").Funcs(template.FuncMap{"quote": shellQuote}).Parse(text)
 	if err != nil {
 		fmt.Fprintf(logger, "watcher: error parsing template %q: %s\n", text, err.Error())
 		return text
