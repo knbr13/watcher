@@ -1,4 +1,4 @@
-module github.com/aladdin-io/watcher
+module github.com/hrtsegv/watcher
 
 go 1.25.5
 
