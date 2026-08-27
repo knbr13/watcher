@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"text/template"
@@ -28,12 +29,24 @@ func addPathRecursively(root string, watcher *fsnotify.Watcher) error {
 	return err
 }
 
-func parseCommand(cmd string) *exec.Cmd {
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
+func parseCommand(cmdStr string) *exec.Cmd {
+	cmdStr = strings.TrimSpace(cmdStr)
+	if cmdStr == "" {
 		return nil
 	}
-	return exec.Command("sh", "-c", cmd)
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		shell := os.Getenv("ComSpec")
+		if shell == "" {
+			shell = "cmd.exe"
+		}
+		cmd = exec.Command(shell, "/C", cmdStr)
+	} else {
+		cmd = exec.Command("sh", "-c", cmdStr)
+	}
+	setProcAttrs(cmd)
+	return cmd
 }
 
 func wrapCmd(cmd *exec.Cmd, data EventData) *exec.Cmd {
