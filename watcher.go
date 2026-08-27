@@ -158,7 +158,7 @@ func runCommand(cmd *exec.Cmd, timeout time.Duration) (int, error) {
 		return -1, err
 
 	case <-time.After(timeout):
-		cmd.Process.Kill()
+		killProcessTree(cmd)
 		<-done
 		return -1, fmt.Errorf("command timed out after %v", timeout)
 	}
